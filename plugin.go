@@ -35,6 +35,8 @@ func (p *Plugin) Name() string {
 	return PluginName
 }
 
+// KV bolt implementation
+
 func (p *Plugin) KvFromConfig(key string) (kv.Storage, error) {
 	const op = errors.Op("boltdb_plugin_provide")
 	st, err := boltkv.NewBoltDBDriver(p.log, key, p.cfg)
