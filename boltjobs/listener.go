@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *consumer) listener() {
+func (c *Consumer) listener() {
 	tt := time.NewTicker(time.Millisecond)
 	defer tt.Stop()
 	for {
@@ -81,7 +81,7 @@ func (c *consumer) listener() {
 	}
 }
 
-func (c *consumer) delayedJobsListener() {
+func (c *Consumer) delayedJobsListener() { //nolint:gocognit
 	tt := time.NewTicker(time.Second)
 	defer tt.Stop()
 
@@ -155,7 +155,7 @@ func (c *consumer) delayedJobsListener() {
 	}
 }
 
-func (c *consumer) rollback(err error, tx *bolt.Tx) {
+func (c *Consumer) rollback(err error, tx *bolt.Tx) {
 	errR := tx.Rollback()
 	if errR != nil {
 		c.log.Error("transaction commit error, rollback failed", zap.Error(err), zap.Error(errR))

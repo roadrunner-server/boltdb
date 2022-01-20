@@ -28,7 +28,7 @@ const (
 	DelayBucket   string = "delayed"
 )
 
-type consumer struct {
+type Consumer struct {
 	file        string
 	permissions int
 	priority    int64
@@ -49,7 +49,7 @@ type consumer struct {
 	stopCh chan struct{}
 }
 
-func NewBoltDBJobs(configKey string, log *zap.Logger, cfg cfgPlugin.Configurer, pq priorityqueue.Queue) (*consumer, error) {
+func NewBoltDBJobs(configKey string, log *zap.Logger, cfg cfgPlugin.Configurer, pq priorityqueue.Queue) (*Consumer, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	if !cfg.Has(configKey) {
@@ -87,43 +87,12 @@ func NewBoltDBJobs(configKey string, log *zap.Logger, cfg cfgPlugin.Configurer, 
 
 	// create bucket if it does not exist
 	// tx.Commit invokes via the db.Update
-	err = db.Update(func(tx *bolt.Tx) error {
-		const upOp = errors.Op("boltdb_plugin_update")
-		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(DelayBucket))
-		if err != nil {
-			return errors.E(op, upOp)
-		}
-
-		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(PushBucket))
-		if err != nil {
-			return errors.E(op, upOp)
-		}
-
-		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(InQueueBucket))
-		if err != nil {
-			return errors.E(op, upOp)
-		}
-
-		inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
-		cursor := inQb.Cursor()
-
-		pushB := tx.Bucket(utils.AsBytes(PushBucket))
-
-		// get all items, which are in the InQueueBucket and put them into the PushBucket
-		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			err = pushB.Put(k, v)
-			if err != nil {
-				return errors.E(op, err)
-			}
-		}
-		return nil
-	})
-
+	err = create(db)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
-	return &consumer{
+	return &Consumer{
 		permissions: localCfg.Permissions,
 		file:        localCfg.File,
 		priority:    localCfg.Priority,
@@ -144,7 +113,7 @@ func NewBoltDBJobs(configKey string, log *zap.Logger, cfg cfgPlugin.Configurer, 
 	}, nil
 }
 
-func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg cfgPlugin.Configurer, pq priorityqueue.Queue) (*consumer, error) {
+func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg cfgPlugin.Configurer, pq priorityqueue.Queue) (*Consumer, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	// if no global section
@@ -175,44 +144,12 @@ func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg cfgPlugin.Co
 
 	// create bucket if it does not exist
 	// tx.Commit invokes via the db.Update
-	err = db.Update(func(tx *bolt.Tx) error {
-		const upOp = errors.Op("boltdb_plugin_update")
-		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(DelayBucket))
-		if err != nil {
-			return errors.E(op, upOp)
-		}
-
-		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(PushBucket))
-		if err != nil {
-			return errors.E(op, upOp)
-		}
-
-		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(InQueueBucket))
-		if err != nil {
-			return errors.E(op, upOp)
-		}
-
-		inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
-		cursor := inQb.Cursor()
-
-		pushB := tx.Bucket(utils.AsBytes(PushBucket))
-
-		// get all items, which are in the InQueueBucket and put them into the PushBucket
-		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			err = pushB.Put(k, v)
-			if err != nil {
-				return errors.E(op, err)
-			}
-		}
-
-		return nil
-	})
-
+	err = create(db)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
-	return &consumer{
+	return &Consumer{
 		file:        pipeline.String(file, rrDB),
 		priority:    pipeline.Priority(),
 		prefetch:    pipeline.Int(prefetch, 1000),
@@ -233,7 +170,7 @@ func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg cfgPlugin.Co
 	}, nil
 }
 
-func (c *consumer) Push(_ context.Context, job *jobs.Job) error {
+func (c *Consumer) Push(_ context.Context, job *jobs.Job) error {
 	const op = errors.Op("boltdb_jobs_push")
 	err := c.db.Update(func(tx *bolt.Tx) error {
 		item := fromJob(job)
@@ -285,12 +222,12 @@ func (c *consumer) Push(_ context.Context, job *jobs.Job) error {
 	return nil
 }
 
-func (c *consumer) Register(_ context.Context, pipeline *pipeline.Pipeline) error {
+func (c *Consumer) Register(_ context.Context, pipeline *pipeline.Pipeline) error {
 	c.pipeline.Store(pipeline)
 	return nil
 }
 
-func (c *consumer) Run(_ context.Context, p *pipeline.Pipeline) error {
+func (c *Consumer) Run(_ context.Context, p *pipeline.Pipeline) error {
 	const op = errors.Op("boltdb_run")
 	start := time.Now()
 
@@ -309,7 +246,7 @@ func (c *consumer) Run(_ context.Context, p *pipeline.Pipeline) error {
 	return nil
 }
 
-func (c *consumer) Stop(_ context.Context) error {
+func (c *Consumer) Stop(_ context.Context) error {
 	start := time.Now()
 	if atomic.LoadUint32(&c.listeners) > 0 {
 		c.stopCh <- struct{}{}
@@ -321,7 +258,7 @@ func (c *consumer) Stop(_ context.Context) error {
 	return c.db.Close()
 }
 
-func (c *consumer) Pause(_ context.Context, p string) {
+func (c *Consumer) Pause(_ context.Context, p string) {
 	start := time.Now()
 	pipe := c.pipeline.Load().(*pipeline.Pipeline)
 	if pipe.Name() != p {
@@ -343,7 +280,7 @@ func (c *consumer) Pause(_ context.Context, p string) {
 	c.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 }
 
-func (c *consumer) Resume(_ context.Context, p string) {
+func (c *Consumer) Resume(_ context.Context, p string) {
 	start := time.Now()
 	pipe := c.pipeline.Load().(*pipeline.Pipeline)
 	if pipe.Name() != p {
@@ -367,7 +304,7 @@ func (c *consumer) Resume(_ context.Context, p string) {
 	c.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 }
 
-func (c *consumer) State(_ context.Context) (*jobs.State, error) {
+func (c *Consumer) State(_ context.Context) (*jobs.State, error) {
 	pipe := c.pipeline.Load().(*pipeline.Pipeline)
 
 	return &jobs.State{
@@ -380,13 +317,54 @@ func (c *consumer) State(_ context.Context) (*jobs.State, error) {
 	}, nil
 }
 
-// Private
+// Private methods
 
-func (c *consumer) get() *bytes.Buffer {
+func create(db *bolt.DB) error {
+	err := db.Update(func(tx *bolt.Tx) error {
+		const upOp = errors.Op("boltdb_plugin_update")
+		_, err := tx.CreateBucketIfNotExists(utils.AsBytes(DelayBucket))
+		if err != nil {
+			return errors.E(upOp, err)
+		}
+
+		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(PushBucket))
+		if err != nil {
+			return errors.E(upOp, err)
+		}
+
+		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(InQueueBucket))
+		if err != nil {
+			return errors.E(upOp, err)
+		}
+
+		inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
+		cursor := inQb.Cursor()
+
+		pushB := tx.Bucket(utils.AsBytes(PushBucket))
+
+		// get all items, which are in the InQueueBucket and put them into the PushBucket
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			err = pushB.Put(k, v)
+			if err != nil {
+				return errors.E(upOp, err)
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Consumer) get() *bytes.Buffer {
 	return c.bPool.Get().(*bytes.Buffer)
 }
 
-func (c *consumer) put(b *bytes.Buffer) {
+func (c *Consumer) put(b *bytes.Buffer) {
 	b.Reset()
 	c.bPool.Put(b)
 }
