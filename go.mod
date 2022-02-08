@@ -9,7 +9,7 @@ require (
 	github.com/roadrunner-server/sdk/v2 v2.8.0-rc.3
 	github.com/stretchr/testify v1.7.0
 	go.etcd.io/bbolt v1.3.6
-	go.uber.org/zap v1.20.0
+	go.uber.org/zap v1.21.0
 )
 
 require (
