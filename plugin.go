@@ -5,10 +5,10 @@ import (
 	"github.com/roadrunner-server/api/v2/plugins/jobs"
 	"github.com/roadrunner-server/api/v2/plugins/jobs/pipeline"
 	"github.com/roadrunner-server/api/v2/plugins/kv"
+	priorityqueue "github.com/roadrunner-server/api/v2/pq"
 	"github.com/roadrunner-server/boltdb/v2/boltjobs"
 	"github.com/roadrunner-server/boltdb/v2/boltkv"
 	"github.com/roadrunner-server/errors"
-	priorityqueue "github.com/roadrunner-server/sdk/v2/priority_queue"
 	"go.uber.org/zap"
 )
 
