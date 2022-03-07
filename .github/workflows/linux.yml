@@ -35,7 +35,7 @@ jobs:
           go-version: ${{ matrix.go }}
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 2 # Fixes codecov error 'Issue detecting commit SHA'
 
