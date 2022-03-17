@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/goccy/go-json v0.9.5
 	github.com/roadrunner-server/api/v2 v2.12.0
-	github.com/roadrunner-server/errors v1.1.1
+	github.com/roadrunner-server/errors v1.1.2
 	github.com/roadrunner-server/sdk/v2 v2.11.0
 	github.com/stretchr/testify v1.7.1
 	go.etcd.io/bbolt v1.3.6
