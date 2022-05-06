@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *Consumer) listener() {
+func (c *Consumer) listener() { //nolint:gocognit
 	tt := time.NewTicker(time.Millisecond * 500)
 	defer tt.Stop()
 	for {
