@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func (c *Consumer) listener() {
-	tt := time.NewTicker(time.Millisecond)
+func (c *Consumer) listener() { //nolint:gocognit
+	tt := time.NewTicker(time.Millisecond * 500)
 	defer tt.Stop()
 	for {
 		select {
@@ -54,10 +54,18 @@ func (c *Consumer) listener() {
 				item.Options.Priority = c.priority
 			}
 
-			err = inQb.Put(utils.AsBytes(item.ID()), v)
-			if err != nil {
-				c.rollback(err, tx)
-				continue
+			// used only for the debug purposes
+			if item.Options.AutoAck {
+				c.log.Debug("auto ack is turned on, message acknowledged")
+			}
+
+			// If AutoAck is false, put the job into the safe DB
+			if !item.Options.AutoAck {
+				err = inQb.Put(utils.AsBytes(item.ID()), v)
+				if err != nil {
+					c.rollback(err, tx)
+					continue
+				}
 			}
 
 			// delete key from the PushBucket
@@ -127,10 +135,18 @@ func (c *Consumer) delayedJobsListener() { //nolint:gocognit
 					item.Options.Priority = c.priority
 				}
 
-				err = inQb.Put(utils.AsBytes(item.ID()), v)
-				if err != nil {
-					c.rollback(err, tx)
-					continue
+				// used only for the debug purposes
+				if item.Options.AutoAck {
+					c.log.Debug("auto ack is turned on, message acknowledged")
+				}
+
+				// If AutoAck is false, put the job into the safe DB
+				if !item.Options.AutoAck {
+					err = inQb.Put(utils.AsBytes(item.ID()), v)
+					if err != nil {
+						c.rollback(err, tx)
+						continue
+					}
 				}
 
 				// delete key from the PushBucket

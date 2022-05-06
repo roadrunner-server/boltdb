@@ -42,6 +42,9 @@ type Options struct {
 	// Delay defines time duration to delay execution for. Defaults to none.
 	Delay int64 `json:"delay,omitempty"`
 
+	// AutoAck option
+	AutoAck bool `json:"auto_ack"`
+
 	// private
 	db      *bbolt.DB
 	active  *uint64
@@ -78,6 +81,18 @@ func (i *Item) Context() ([]byte, error) {
 }
 
 func (i *Item) Ack() error {
+	defer func() {
+		if i.Options.Delay > 0 {
+			atomic.AddUint64(i.Options.delayed, ^uint64(0))
+		} else {
+			atomic.AddUint64(i.Options.active, ^uint64(0))
+		}
+	}()
+
+	if i.Options.AutoAck {
+		return nil
+	}
+
 	const op = errors.Op("boltdb_item_ack")
 	tx, err := i.Options.db.Begin(true)
 	if err != nil {
@@ -95,16 +110,15 @@ func (i *Item) Ack() error {
 		return errors.E(op, err)
 	}
 
-	if i.Options.Delay > 0 {
-		atomic.AddUint64(i.Options.delayed, ^uint64(0))
-	} else {
-		atomic.AddUint64(i.Options.active, ^uint64(0))
-	}
-
 	return tx.Commit()
 }
 
 func (i *Item) Nack() error {
+	// don't NACK the job when it was already ack'ed
+	if i.Options.AutoAck {
+		return nil
+	}
+
 	const op = errors.Op("boltdb_item_ack")
 	/*
 		steps:
@@ -231,6 +245,7 @@ func fromJob(job *jobs.Job) *Item {
 		Payload: job.Payload,
 		Headers: job.Headers,
 		Options: &Options{
+			AutoAck:  job.Options.AutoAck,
 			Priority: job.Options.Priority,
 			Pipeline: job.Options.Pipeline,
 			Delay:    job.Options.Delay,
