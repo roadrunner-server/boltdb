@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	PluginName string = "boltdb"
-	rrDB       string = "rr.db"
+	name string = "boltdb"
+	rrDB string = "rr.db"
 
 	PushBucket    string = "push"
 	InQueueBucket string = "processing"
@@ -57,12 +57,12 @@ func NewBoltDBJobs(configKey string, log *zap.Logger, cfg cfgPlugin.Configurer, 
 	}
 
 	// if no global section
-	if !cfg.Has(PluginName) {
+	if !cfg.Has(name) {
 		return nil, errors.E(op, errors.Str("no global boltdb configuration"))
 	}
 
 	var localCfg config
-	err := cfg.UnmarshalKey(PluginName, &localCfg)
+	err := cfg.UnmarshalKey(name, &localCfg)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -117,12 +117,12 @@ func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg cfgPlugin.Co
 	const op = errors.Op("init_boltdb_jobs")
 
 	// if no global section
-	if !cfg.Has(PluginName) {
+	if !cfg.Has(name) {
 		return nil, errors.E(op, errors.Str("no global boltdb configuration"))
 	}
 
 	var conf config
-	err := cfg.UnmarshalKey(PluginName, conf)
+	err := cfg.UnmarshalKey(name, conf)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
