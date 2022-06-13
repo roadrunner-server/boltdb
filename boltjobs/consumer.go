@@ -311,6 +311,7 @@ func (c *Consumer) State(_ context.Context) (*jobs.State, error) {
 		Pipeline: pipe.Name(),
 		Driver:   pipe.Driver(),
 		Queue:    PushBucket,
+		Priority: uint64(pipe.Priority()),
 		Active:   int64(atomic.LoadUint64(c.active)),
 		Delayed:  int64(atomic.LoadUint64(c.delayed)),
 		Ready:    toBool(atomic.LoadUint32(&c.listeners)),
