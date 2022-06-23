@@ -6,7 +6,7 @@ require (
 	github.com/goccy/go-json v0.9.7
 	github.com/roadrunner-server/api/v2 v2.18.0
 	github.com/roadrunner-server/errors v1.1.2
-	github.com/roadrunner-server/sdk/v2 v2.15.0
+	github.com/roadrunner-server/sdk/v2 v2.16.0
 	github.com/stretchr/testify v1.7.4
 	go.buf.build/protocolbuffers/go/roadrunner-server/api v1.2.5
 	go.etcd.io/bbolt v1.3.6
@@ -19,7 +19,7 @@ require (
 	github.com/roadrunner-server/tcplisten v1.1.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
-	golang.org/x/sys v0.0.0-20220615213510-4f61da869c0c // indirect
+	golang.org/x/sys v0.0.0-20220622161953-175b2fd9d664 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
