@@ -22,19 +22,19 @@ func TestPluginName(t *testing.T) {
 
 type Cfg struct{}
 
-func (c *Cfg) UnmarshalKey(name string, out interface{}) error {
+func (c *Cfg) UnmarshalKey(name string, out any) error {
 	return nil
 }
 
-func (c *Cfg) Unmarshal(out interface{}) error {
+func (c *Cfg) Unmarshal(out any) error {
 	return nil
 }
 
-func (c *Cfg) Get(name string) interface{} {
+func (c *Cfg) Get(name string) any {
 	return nil
 }
 
-func (c *Cfg) Overwrite(values map[string]interface{}) error {
+func (c *Cfg) Overwrite(values map[string]any) error {
 	return nil
 }
 

@@ -158,14 +158,14 @@ func (i *Item) Nack() error {
 
 /*
 Requeue algorithm:
-1. Rewrite item headers and delay.
-2. Begin writable transaction on attached to the item db.
-3. Delete item from the InQueueBucket
-4. Handle items with the delay:
-   4.1. Get DelayBucket
-   4.2. Make a key by adding the delay to the time.Now() in RFC3339 format
-   4.3. Put this key with value to the DelayBucket
-5. W/o delay, put the key with value to the PushBucket (requeue)
+ 1. Rewrite item headers and delay.
+ 2. Begin writable transaction on attached to the item db.
+ 3. Delete item from the InQueueBucket
+ 4. Handle items with the delay:
+    4.1. Get DelayBucket
+    4.2. Make a key by adding the delay to the time.Now() in RFC3339 format
+    4.3. Put this key with value to the DelayBucket
+ 5. W/o delay, put the key with value to the PushBucket (requeue)
 */
 func (i *Item) Requeue(headers map[string][]string, delay int64) error {
 	const op = errors.Op("boltdb_item_requeue")

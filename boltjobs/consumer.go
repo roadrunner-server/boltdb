@@ -98,7 +98,7 @@ func NewBoltDBJobs(configKey string, log *zap.Logger, cfg cfgPlugin.Configurer, 
 		priority:    localCfg.Priority,
 		prefetch:    localCfg.Prefetch,
 
-		bPool: sync.Pool{New: func() interface{} {
+		bPool: sync.Pool{New: func() any {
 			return new(bytes.Buffer)
 		}},
 		cond: sync.NewCond(&sync.Mutex{}),
@@ -155,7 +155,7 @@ func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg cfgPlugin.Co
 		prefetch:    pipeline.Int(prefetch, 1000),
 		permissions: conf.Permissions,
 
-		bPool: sync.Pool{New: func() interface{} {
+		bPool: sync.Pool{New: func() any {
 			return new(bytes.Buffer)
 		}},
 		cond: sync.NewCond(&sync.Mutex{}),

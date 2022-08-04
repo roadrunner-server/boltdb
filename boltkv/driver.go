@@ -428,7 +428,7 @@ func (d *Driver) startGCLoop() { //nolint:gocognit
 
 				// calculate current time before loop started to be fair
 				now := time.Now()
-				d.gc.Range(func(key, value interface{}) bool {
+				d.gc.Range(func(key, value any) bool {
 					const op = errors.Op("boltdb_plugin_gc")
 					k := key.(string)
 					v, err := time.Parse(time.RFC3339, value.(string))
