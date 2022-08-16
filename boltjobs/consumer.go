@@ -39,7 +39,7 @@ type Consumer struct {
 	bPool    sync.Pool
 	log      *zap.Logger
 	pq       priorityqueue.Queue
-	pipeline atomic.Value
+	pipeline atomic.Pointer[pipeline.Pipeline]
 	cond     *sync.Cond
 
 	listeners uint32
@@ -231,7 +231,7 @@ func (c *Consumer) Run(_ context.Context, p *pipeline.Pipeline) error {
 	const op = errors.Op("boltdb_run")
 	start := time.Now()
 
-	pipe := c.pipeline.Load().(*pipeline.Pipeline)
+	pipe := c.pipeline.Load()
 	if pipe.Name() != p.Name() {
 		return errors.E(op, errors.Errorf("no such pipeline registered: %s", pipe.Name()))
 	}
@@ -253,14 +253,14 @@ func (c *Consumer) Stop(_ context.Context) error {
 		c.stopCh <- struct{}{}
 	}
 
-	pipe := c.pipeline.Load().(*pipeline.Pipeline)
+	pipe := c.pipeline.Load()
 	c.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 	return c.db.Close()
 }
 
 func (c *Consumer) Pause(_ context.Context, p string) {
 	start := time.Now()
-	pipe := c.pipeline.Load().(*pipeline.Pipeline)
+	pipe := c.pipeline.Load()
 	if pipe.Name() != p {
 		c.log.Error("no such pipeline", zap.String("pause was requested", p))
 	}
@@ -282,7 +282,7 @@ func (c *Consumer) Pause(_ context.Context, p string) {
 
 func (c *Consumer) Resume(_ context.Context, p string) {
 	start := time.Now()
-	pipe := c.pipeline.Load().(*pipeline.Pipeline)
+	pipe := c.pipeline.Load()
 	if pipe.Name() != p {
 		c.log.Error("no such pipeline", zap.String("resume was requested", p))
 	}
@@ -305,7 +305,7 @@ func (c *Consumer) Resume(_ context.Context, p string) {
 }
 
 func (c *Consumer) State(_ context.Context) (*jobs.State, error) {
-	pipe := c.pipeline.Load().(*pipeline.Pipeline)
+	pipe := c.pipeline.Load()
 
 	return &jobs.State{
 		Pipeline: pipe.Name(),
