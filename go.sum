@@ -14,8 +14,6 @@ github.com/roadrunner-server/api/v2 v2.23.0-rc.2 h1:twkxxyZ6oYIKLQy7xG/wmS6uQIW2
 github.com/roadrunner-server/api/v2 v2.23.0-rc.2/go.mod h1:ranAmPVMvmJf6Eto9yskazN8Z4axt7ajlbbqboeo4uE=
 github.com/roadrunner-server/errors v1.2.0 h1:qBmNXt8Iex9QnYTjCkbJKsBZu2EtYkQCM06GUDcQBbI=
 github.com/roadrunner-server/errors v1.2.0/go.mod h1:z0ECxZp/dDa5RahtMcy4mBIavVxiZ9vwE5kByl7kFtY=
-github.com/roadrunner-server/sdk/v2 v2.19.0-rc.3 h1:EeRJE/AG+okYtHNOiU0LW3/EyVCmZYfe1ks7MD8pjVo=
-github.com/roadrunner-server/sdk/v2 v2.19.0-rc.3/go.mod h1:NejZdhP6ta+7ddWqRgyQ4l1JCO5P+btRhUuHO4Ikbs4=
 github.com/roadrunner-server/sdk/v2 v2.19.0-rc.4 h1:iaCjG93fY9zhzluUP/cLrdESi1movchkvd6EdiNPgjs=
 github.com/roadrunner-server/sdk/v2 v2.19.0-rc.4/go.mod h1:NejZdhP6ta+7ddWqRgyQ4l1JCO5P+btRhUuHO4Ikbs4=
 github.com/roadrunner-server/tcplisten v1.2.0 h1:nsiXEEb0zP7vjAsCWNHKpM0HdwFK/KlafFF/2gsTJlg=
@@ -40,8 +38,6 @@ go.uber.org/multierr v1.8.0/go.mod h1:7EAYxJLBy9rStEaz58O2t4Uvip6FSURkq8/ppBp95a
 go.uber.org/zap v1.23.0 h1:OjGQ5KQDEUawVHxNwQgPpiypGHOxo2mNZsOqTak4fFY=
 go.uber.org/zap v1.23.0/go.mod h1:D+nX8jyLsMHMYrln8A0rJjFt/T/9/bGgIhAqxv5URuY=
 golang.org/x/sys v0.0.0-20200923182605-d9f96fdee20d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-golang.org/x/sys v0.0.0-20220907062415-87db552b00fd h1:AZeIEzg+8RCELJYq8w+ODLVxFgLMMigSwO/ffKPEd9U=
-golang.org/x/sys v0.0.0-20220907062415-87db552b00fd/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.0.0-20220908164124-27713097b956 h1:XeJjHH1KiLpKGb6lvMiksZ9l0fVUh+AmGcm0nOMEBOY=
 golang.org/x/sys v0.0.0-20220908164124-27713097b956/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543 h1:E7g+9GITq07hpfrRu66IVDexMakfv52eLZ2CXBWiKr4=
