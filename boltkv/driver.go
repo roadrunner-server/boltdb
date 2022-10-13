@@ -8,9 +8,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/roadrunner-server/api/v2/plugins/config"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/sdk/v2/utils"
+	"github.com/roadrunner-server/sdk/v3/utils"
 	kvv1 "go.buf.build/protocolbuffers/go/roadrunner-server/api/proto/kv/v1"
 	bolt "go.etcd.io/bbolt"
 	"go.uber.org/zap"
@@ -38,7 +37,14 @@ type Driver struct {
 	stop chan struct{}
 }
 
-func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin config.Configurer) (*Driver, error) {
+type Configurer interface {
+	// UnmarshalKey takes a single key and unmarshal it into a Struct.
+	UnmarshalKey(name string, out any) error
+	// Has checks if config section exists.
+	Has(name string) bool
+}
+
+func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer) (*Driver, error) {
 	const op = errors.Op("new_boltdb_driver")
 
 	if !cfgPlugin.Has(RootPluginName) {

@@ -1,14 +1,13 @@
 package boltdb
 
 import (
-	"github.com/roadrunner-server/api/v2/plugins/config"
-	"github.com/roadrunner-server/api/v2/plugins/jobs"
-	"github.com/roadrunner-server/api/v2/plugins/jobs/pipeline"
-	"github.com/roadrunner-server/api/v2/plugins/kv"
-	priorityqueue "github.com/roadrunner-server/api/v2/pq"
-	"github.com/roadrunner-server/boltdb/v2/boltjobs"
-	"github.com/roadrunner-server/boltdb/v2/boltkv"
+	"github.com/roadrunner-server/boltdb/v3/boltjobs"
+	"github.com/roadrunner-server/boltdb/v3/boltkv"
 	"github.com/roadrunner-server/errors"
+	"github.com/roadrunner-server/sdk/v3/plugins/jobs"
+	"github.com/roadrunner-server/sdk/v3/plugins/jobs/pipeline"
+	"github.com/roadrunner-server/sdk/v3/plugins/kv"
+	priorityqueue "github.com/roadrunner-server/sdk/v3/priority_queue"
 	"go.uber.org/zap"
 )
 
@@ -16,14 +15,21 @@ const (
 	PluginName string = "boltdb"
 )
 
+type Configurer interface {
+	// UnmarshalKey takes a single key and unmarshal it into a Struct.
+	UnmarshalKey(name string, out any) error
+	// Has checks if config section exists.
+	Has(name string) bool
+}
+
 // Plugin BoltDB K/V storage.
 type Plugin struct {
-	cfg config.Configurer
+	cfg Configurer
 	// logger
 	log *zap.Logger
 }
 
-func (p *Plugin) Init(log *zap.Logger, cfg config.Configurer) error {
+func (p *Plugin) Init(log *zap.Logger, cfg Configurer) error {
 	p.log = new(zap.Logger)
 	*p.log = *log
 	p.cfg = cfg

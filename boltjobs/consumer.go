@@ -9,12 +9,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	cfgPlugin "github.com/roadrunner-server/api/v2/plugins/config"
-	"github.com/roadrunner-server/api/v2/plugins/jobs"
-	"github.com/roadrunner-server/api/v2/plugins/jobs/pipeline"
-	priorityqueue "github.com/roadrunner-server/api/v2/pq"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/sdk/v2/utils"
+	"github.com/roadrunner-server/sdk/v3/plugins/jobs"
+	"github.com/roadrunner-server/sdk/v3/plugins/jobs/pipeline"
+	priorityqueue "github.com/roadrunner-server/sdk/v3/priority_queue"
+	"github.com/roadrunner-server/sdk/v3/utils"
 	bolt "go.etcd.io/bbolt"
 	"go.uber.org/zap"
 )
@@ -27,6 +26,13 @@ const (
 	InQueueBucket string = "processing"
 	DelayBucket   string = "delayed"
 )
+
+type Configurer interface {
+	// UnmarshalKey takes a single key and unmarshal it into a Struct.
+	UnmarshalKey(name string, out any) error
+	// Has checks if config section exists.
+	Has(name string) bool
+}
 
 type Consumer struct {
 	file        string
@@ -49,7 +55,7 @@ type Consumer struct {
 	stopCh chan struct{}
 }
 
-func NewBoltDBJobs(configKey string, log *zap.Logger, cfg cfgPlugin.Configurer, pq priorityqueue.Queue) (*Consumer, error) {
+func NewBoltDBJobs(configKey string, log *zap.Logger, cfg Configurer, pq priorityqueue.Queue) (*Consumer, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	if !cfg.Has(configKey) {
@@ -113,7 +119,7 @@ func NewBoltDBJobs(configKey string, log *zap.Logger, cfg cfgPlugin.Configurer, 
 	}, nil
 }
 
-func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg cfgPlugin.Configurer, pq priorityqueue.Queue) (*Consumer, error) {
+func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg Configurer, pq priorityqueue.Queue) (*Consumer, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	// if no global section
