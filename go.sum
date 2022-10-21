@@ -23,10 +23,10 @@ github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.0 h1:pSgiaMZlXftHpm5L7V1+rVB+AZJydKsMxsQBIJw4PKk=
 github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
-go.buf.build/protocolbuffers/go/roadrunner-server/api v1.3.12 h1:FYKxBvxYcSr60jI/n/tclPA0H6zk0jUXmL2fWBiQswg=
-go.buf.build/protocolbuffers/go/roadrunner-server/api v1.3.12/go.mod h1:CfIAvR+W2N+Y0WXMzwT80Eh83CmBPWplgFQDA5HftC4=
 go.buf.build/protocolbuffers/go/roadrunner-server/api v1.3.14 h1:cF0FYP0e/z50tAekAthICGetKerk9FSiMR8+mfdKbMw=
 go.buf.build/protocolbuffers/go/roadrunner-server/api v1.3.14/go.mod h1:CfIAvR+W2N+Y0WXMzwT80Eh83CmBPWplgFQDA5HftC4=
+go.buf.build/protocolbuffers/go/roadrunner-server/api v1.3.15 h1:JJ4OryOaqjWjG/q+upKugdlqtAeg+sLcyOm1wE0163A=
+go.buf.build/protocolbuffers/go/roadrunner-server/api v1.3.15/go.mod h1:CfIAvR+W2N+Y0WXMzwT80Eh83CmBPWplgFQDA5HftC4=
 go.etcd.io/bbolt v1.3.6 h1:/ecaJf0sk1l4l6V4awd65v2C3ILy7MSj+s/x1ADCIMU=
 go.etcd.io/bbolt v1.3.6/go.mod h1:qXsaaIqmgQH0T+OPdb99Bf+PKfBBQVAdyD6TY9G8XM4=
 go.uber.org/atomic v1.7.0/go.mod h1:fEN4uk6kAWBTFdckzkM89CLk9XfWZrxpCo0nPH17wJc=
