@@ -9,7 +9,7 @@ require (
 	github.com/stretchr/testify v1.8.1
 	go.buf.build/protocolbuffers/go/roadrunner-server/api v1.3.27
 	go.etcd.io/bbolt v1.3.6
-	go.uber.org/zap v1.23.0
+	go.uber.org/zap v1.24.0
 )
 
 require (
