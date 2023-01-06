@@ -9,10 +9,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/roadrunner-server/api/v3/plugins/v1/jobs"
+	pq "github.com/roadrunner-server/api/v3/plugins/v1/priority_queue"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/sdk/v3/plugins/jobs"
-	"github.com/roadrunner-server/sdk/v3/plugins/jobs/pipeline"
-	priorityqueue "github.com/roadrunner-server/sdk/v3/priority_queue"
 	"github.com/roadrunner-server/sdk/v3/utils"
 	bolt "go.etcd.io/bbolt"
 	"go.uber.org/zap"
@@ -44,8 +43,8 @@ type Consumer struct {
 
 	bPool    sync.Pool
 	log      *zap.Logger
-	pq       priorityqueue.Queue
-	pipeline atomic.Pointer[pipeline.Pipeline]
+	pq       pq.Queue
+	pipeline atomic.Pointer[jobs.Pipeline]
 	cond     *sync.Cond
 
 	listeners uint32
@@ -55,7 +54,7 @@ type Consumer struct {
 	stopCh chan struct{}
 }
 
-func NewBoltDBJobs(configKey string, log *zap.Logger, cfg Configurer, pq priorityqueue.Queue) (*Consumer, error) {
+func NewBoltDBJobs(configKey string, log *zap.Logger, cfg Configurer, pq pq.Queue) (*Consumer, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	if !cfg.Has(configKey) {
@@ -119,7 +118,7 @@ func NewBoltDBJobs(configKey string, log *zap.Logger, cfg Configurer, pq priorit
 	}, nil
 }
 
-func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg Configurer, pq priorityqueue.Queue) (*Consumer, error) {
+func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq.Queue) (*Consumer, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	// if no global section
@@ -176,7 +175,7 @@ func FromPipeline(pipeline *pipeline.Pipeline, log *zap.Logger, cfg Configurer, 
 	}, nil
 }
 
-func (c *Consumer) Push(_ context.Context, job *jobs.Job) error {
+func (c *Consumer) Push(_ context.Context, job jobs.Job) error {
 	const op = errors.Op("boltdb_jobs_push")
 	err := c.db.Update(func(tx *bolt.Tx) error {
 		item := fromJob(job)
@@ -228,16 +227,16 @@ func (c *Consumer) Push(_ context.Context, job *jobs.Job) error {
 	return nil
 }
 
-func (c *Consumer) Register(_ context.Context, pipeline *pipeline.Pipeline) error {
-	c.pipeline.Store(pipeline)
+func (c *Consumer) Register(_ context.Context, pipeline jobs.Pipeline) error {
+	c.pipeline.Store(&pipeline)
 	return nil
 }
 
-func (c *Consumer) Run(_ context.Context, p *pipeline.Pipeline) error {
+func (c *Consumer) Run(_ context.Context, p jobs.Pipeline) error {
 	const op = errors.Op("boltdb_run")
 	start := time.Now()
 
-	pipe := c.pipeline.Load()
+	pipe := *c.pipeline.Load()
 	if pipe.Name() != p.Name() {
 		return errors.E(op, errors.Errorf("no such pipeline registered: %s", pipe.Name()))
 	}
@@ -259,14 +258,14 @@ func (c *Consumer) Stop(_ context.Context) error {
 		c.stopCh <- struct{}{}
 	}
 
-	pipe := c.pipeline.Load()
+	pipe := *c.pipeline.Load()
 	c.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 	return c.db.Close()
 }
 
 func (c *Consumer) Pause(_ context.Context, p string) {
 	start := time.Now()
-	pipe := c.pipeline.Load()
+	pipe := *c.pipeline.Load()
 	if pipe.Name() != p {
 		c.log.Error("no such pipeline", zap.String("pause was requested", p))
 	}
@@ -288,7 +287,7 @@ func (c *Consumer) Pause(_ context.Context, p string) {
 
 func (c *Consumer) Resume(_ context.Context, p string) {
 	start := time.Now()
-	pipe := c.pipeline.Load()
+	pipe := *c.pipeline.Load()
 	if pipe.Name() != p {
 		c.log.Error("no such pipeline", zap.String("resume was requested", p))
 	}
@@ -311,7 +310,7 @@ func (c *Consumer) Resume(_ context.Context, p string) {
 }
 
 func (c *Consumer) State(_ context.Context) (*jobs.State, error) {
-	pipe := c.pipeline.Load()
+	pipe := *c.pipeline.Load()
 
 	return &jobs.State{
 		Pipeline: pipe.Name(),

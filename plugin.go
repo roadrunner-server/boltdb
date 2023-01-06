@@ -1,13 +1,12 @@
 package boltdb
 
 import (
+	"github.com/roadrunner-server/api/v3/plugins/v1/jobs"
+	"github.com/roadrunner-server/api/v3/plugins/v1/kv"
+	pq "github.com/roadrunner-server/api/v3/plugins/v1/priority_queue"
 	"github.com/roadrunner-server/boltdb/v3/boltjobs"
 	"github.com/roadrunner-server/boltdb/v3/boltkv"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/sdk/v3/plugins/jobs"
-	"github.com/roadrunner-server/sdk/v3/plugins/jobs/pipeline"
-	"github.com/roadrunner-server/sdk/v3/plugins/kv"
-	priorityqueue "github.com/roadrunner-server/sdk/v3/priority_queue"
 	"go.uber.org/zap"
 )
 
@@ -22,6 +21,10 @@ type Configurer interface {
 	Has(name string) bool
 }
 
+type Logger interface {
+	NamedLogger(name string) *zap.Logger
+}
+
 // Plugin BoltDB K/V storage.
 type Plugin struct {
 	cfg Configurer
@@ -29,9 +32,8 @@ type Plugin struct {
 	log *zap.Logger
 }
 
-func (p *Plugin) Init(log *zap.Logger, cfg Configurer) error {
-	p.log = new(zap.Logger)
-	*p.log = *log
+func (p *Plugin) Init(log Logger, cfg Configurer) error {
+	p.log = log.NamedLogger(PluginName)
 	p.cfg = cfg
 	return nil
 }
@@ -54,10 +56,10 @@ func (p *Plugin) KvFromConfig(key string) (kv.Storage, error) {
 
 // JOBS bbolt implementation
 
-func (p *Plugin) ConsumerFromConfig(configKey string, queue priorityqueue.Queue) (jobs.Consumer, error) {
+func (p *Plugin) ConsumerFromConfig(configKey string, queue pq.Queue) (jobs.Consumer, error) {
 	return boltjobs.NewBoltDBJobs(configKey, p.log, p.cfg, queue)
 }
 
-func (p *Plugin) ConsumerFromPipeline(pipe *pipeline.Pipeline, queue priorityqueue.Queue) (jobs.Consumer, error) {
+func (p *Plugin) ConsumerFromPipeline(pipe jobs.Pipeline, queue pq.Queue) (jobs.Consumer, error) {
 	return boltjobs.FromPipeline(pipe, p.log, p.cfg, queue)
 }

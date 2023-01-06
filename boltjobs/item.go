@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
+	"github.com/roadrunner-server/api/v3/plugins/v1/jobs"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/sdk/v3/plugins/jobs"
 	"github.com/roadrunner-server/sdk/v3/utils"
 	"go.etcd.io/bbolt"
 )
@@ -238,17 +238,17 @@ func (i *Item) rollback(err error, tx *bbolt.Tx) error {
 	return errors.Errorf("transaction commit error: %v", err)
 }
 
-func fromJob(job *jobs.Job) *Item {
+func fromJob(job jobs.Job) *Item {
 	return &Item{
-		Job:     job.Job,
-		Ident:   job.Ident,
-		Payload: job.Payload,
-		Headers: job.Headers,
+		Job:     job.Name(),
+		Ident:   job.ID(),
+		Payload: job.Payload(),
+		Headers: job.Headers(),
 		Options: &Options{
-			AutoAck:  job.Options.AutoAck,
-			Priority: job.Options.Priority,
-			Pipeline: job.Options.Pipeline,
-			Delay:    job.Options.Delay,
+			AutoAck:  job.AutoAck(),
+			Priority: job.Priority(),
+			Pipeline: job.Pipeline(),
+			Delay:    job.Delay(),
 		},
 	}
 }

@@ -8,11 +8,16 @@ import (
 	"go.uber.org/zap"
 )
 
-var noopLog = zap.NewNop() //nolint:gochecknoglobals
+type testLog struct{}
+
+func (tl *testLog) NamedLogger(string) *zap.Logger {
+	log, _ := zap.NewDevelopment()
+	return log
+}
 
 func TestPluginInit(t *testing.T) {
 	p := Plugin{}
-	require.NoError(t, p.Init(noopLog, &Cfg{}))
+	require.NoError(t, p.Init(&testLog{}, &Cfg{}))
 }
 
 func TestPluginName(t *testing.T) {
@@ -22,23 +27,23 @@ func TestPluginName(t *testing.T) {
 
 type Cfg struct{}
 
-func (c *Cfg) UnmarshalKey(name string, out any) error {
+func (c *Cfg) UnmarshalKey(string, any) error {
 	return nil
 }
 
-func (c *Cfg) Unmarshal(out any) error {
+func (c *Cfg) Unmarshal(any) error {
 	return nil
 }
 
-func (c *Cfg) Get(name string) any {
+func (c *Cfg) Get(string) any {
 	return nil
 }
 
-func (c *Cfg) Overwrite(values map[string]any) error {
+func (c *Cfg) Overwrite(map[string]any) error {
 	return nil
 }
 
-func (c *Cfg) Has(name string) bool {
+func (c *Cfg) Has(string) bool {
 	return false
 }
 

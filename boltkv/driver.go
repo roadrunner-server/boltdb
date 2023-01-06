@@ -8,16 +8,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/roadrunner-server/api/v3/plugins/v1/kv"
 	"github.com/roadrunner-server/errors"
 	"github.com/roadrunner-server/sdk/v3/utils"
-	kvv1 "go.buf.build/protocolbuffers/go/roadrunner-server/api/kv/v1"
 	bolt "go.etcd.io/bbolt"
 	"go.uber.org/zap"
 )
 
-const (
-	RootPluginName string = "kv"
-)
+const RootPluginName string = "kv"
+
+type Configurer interface {
+	// UnmarshalKey takes a single key and unmarshal it into a Struct.
+	UnmarshalKey(name string, out any) error
+	// Has checks if config section exists.
+	Has(name string) bool
+}
 
 type Driver struct {
 	clearMu sync.RWMutex
@@ -37,13 +42,6 @@ type Driver struct {
 	stop chan struct{}
 }
 
-type Configurer interface {
-	// UnmarshalKey takes a single key and unmarshal it into a Struct.
-	UnmarshalKey(name string, out any) error
-	// Has checks if config section exists.
-	Has(name string) bool
-}
-
 func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer) (*Driver, error) {
 	const op = errors.Op("new_boltdb_driver")
 
@@ -53,7 +51,7 @@ func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer) (*Driver
 
 	d := &Driver{
 		log:  log,
-		stop: make(chan struct{}),
+		stop: make(chan struct{}, 1),
 	}
 
 	err := cfgPlugin.UnmarshalKey(key, &d.cfg)
@@ -69,11 +67,7 @@ func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer) (*Driver
 	d.gc = sync.Map{}
 
 	db, err := bolt.Open(d.cfg.File, os.FileMode(d.cfg.Permissions), &bolt.Options{
-		Timeout:        time.Second * 20,
-		NoGrowSync:     false,
-		NoFreelistSync: false,
-		ReadOnly:       false,
-		NoSync:         false,
+		Timeout: time.Second * 20,
 	})
 
 	if err != nil {
@@ -235,7 +229,7 @@ func (d *Driver) MGet(keys ...string) (map[string][]byte, error) {
 }
 
 // Set puts the K/V to the bolt
-func (d *Driver) Set(items ...*kvv1.Item) error {
+func (d *Driver) Set(items ...kv.Item) error {
 	const op = errors.Op("boltdb_driver_set")
 	if items == nil {
 		return errors.E(op, errors.NoKeys)
@@ -269,26 +263,26 @@ func (d *Driver) Set(items ...*kvv1.Item) error {
 		}
 
 		// Encode value
-		err = encoder.Encode(&items[i].Value)
+		err = encoder.Encode(items[i].Value())
 		if err != nil {
 			return errors.E(op, err)
 		}
 		// buf.Bytes will copy the underlying slice. Take a look in case of performance problems
-		err = b.Put([]byte(items[i].Key), buf.Bytes())
+		err = b.Put([]byte(items[i].Key()), buf.Bytes())
 		if err != nil {
 			return errors.E(op, err)
 		}
 
 		// if there are no errors, and TTL > 0,  we put the key with timeout to the hashmap, for future check
 		// we do not need mutex here, since we use sync.Map
-		if items[i].Timeout != "" {
+		if items[i].Timeout() != "" {
 			// check correctness of provided TTL
-			_, err := time.Parse(time.RFC3339, items[i].Timeout)
+			_, err := time.Parse(time.RFC3339, items[i].Timeout())
 			if err != nil {
 				return errors.E(op, err)
 			}
 			// Store key TTL in the separate map
-			d.gc.Store(items[i].Key, items[i].Timeout)
+			d.gc.Store(items[i].Key(), items[i].Timeout())
 		}
 
 		buf.Reset()
@@ -345,20 +339,20 @@ func (d *Driver) Delete(keys ...string) error {
 
 // MExpire sets the expiration time to the key
 // If key already has the expiration time, it will be overwritten
-func (d *Driver) MExpire(items ...*kvv1.Item) error {
+func (d *Driver) MExpire(items ...kv.Item) error {
 	const op = errors.Op("boltdb_driver_mexpire")
 	for i := range items {
-		if items[i].Timeout == "" || strings.TrimSpace(items[i].Key) == "" {
+		if items[i].Timeout() == "" || strings.TrimSpace(items[i].Key()) == "" {
 			return errors.E(op, errors.Str("should set timeout and at least one key"))
 		}
 
 		// verify provided TTL
-		_, err := time.Parse(time.RFC3339, items[i].Timeout)
+		_, err := time.Parse(time.RFC3339, items[i].Timeout())
 		if err != nil {
 			return errors.E(op, err)
 		}
 
-		d.gc.Store(items[i].Key, items[i].Timeout)
+		d.gc.Store(items[i].Key(), items[i].Timeout())
 	}
 	return nil
 }
