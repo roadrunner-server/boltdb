@@ -4,8 +4,8 @@ import (
 	"github.com/roadrunner-server/api/v3/plugins/v1/jobs"
 	"github.com/roadrunner-server/api/v3/plugins/v1/kv"
 	pq "github.com/roadrunner-server/api/v3/plugins/v1/priority_queue"
-	"github.com/roadrunner-server/boltdb/v3/boltjobs"
-	"github.com/roadrunner-server/boltdb/v3/boltkv"
+	"github.com/roadrunner-server/boltdb/v4/boltjobs"
+	"github.com/roadrunner-server/boltdb/v4/boltkv"
 	"github.com/roadrunner-server/errors"
 	"go.uber.org/zap"
 )
