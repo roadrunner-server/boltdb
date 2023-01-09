@@ -6,7 +6,7 @@ require (
 	github.com/goccy/go-json v0.10.0
 	github.com/roadrunner-server/api/v3 v3.1.2
 	github.com/roadrunner-server/errors v1.2.0
-	github.com/roadrunner-server/sdk/v3 v3.1.0
+	github.com/roadrunner-server/sdk/v3 v3.2.0
 	github.com/stretchr/testify v1.8.1
 	go.etcd.io/bbolt v1.3.6
 	go.uber.org/zap v1.24.0
