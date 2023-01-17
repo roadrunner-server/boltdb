@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/goccy/go-json v0.10.0
-	github.com/roadrunner-server/api/v3 v3.1.2
+	github.com/roadrunner-server/api/v3 v3.2.0
 	github.com/roadrunner-server/errors v1.2.0
 	github.com/roadrunner-server/sdk/v4 v4.0.0
 	github.com/stretchr/testify v1.8.1
