@@ -1,9 +1,9 @@
 package boltdb
 
 import (
-	"github.com/roadrunner-server/api/v3/plugins/v1/jobs"
-	"github.com/roadrunner-server/api/v3/plugins/v1/kv"
-	pq "github.com/roadrunner-server/api/v3/plugins/v1/priority_queue"
+	"github.com/roadrunner-server/api/v4/plugins/v1/jobs"
+	"github.com/roadrunner-server/api/v4/plugins/v1/kv"
+	pq "github.com/roadrunner-server/api/v4/plugins/v1/priority_queue"
 	"github.com/roadrunner-server/boltdb/v4/boltjobs"
 	"github.com/roadrunner-server/boltdb/v4/boltkv"
 	"github.com/roadrunner-server/errors"
@@ -33,6 +33,10 @@ type Plugin struct {
 }
 
 func (p *Plugin) Init(log Logger, cfg Configurer) error {
+	if !cfg.Has(PluginName) {
+		return errors.E(errors.Disabled)
+	}
+
 	p.log = log.NamedLogger(PluginName)
 	p.cfg = cfg
 	return nil
@@ -56,10 +60,12 @@ func (p *Plugin) KvFromConfig(key string) (kv.Storage, error) {
 
 // JOBS bbolt implementation
 
-func (p *Plugin) ConsumerFromConfig(configKey string, queue pq.Queue) (jobs.Consumer, error) {
-	return boltjobs.NewBoltDBJobs(configKey, p.log, p.cfg, queue)
+// DriverFromConfig constructs kafka driver from the .rr.yaml configuration
+func (p *Plugin) DriverFromConfig(configKey string, pq pq.Queue, pipeline jobs.Pipeline, cmder chan<- jobs.Commander) (jobs.Driver, error) {
+	return boltjobs.FromConfig(configKey, p.log, p.cfg, pipeline, pq, cmder)
 }
 
-func (p *Plugin) ConsumerFromPipeline(pipe jobs.Pipeline, queue pq.Queue) (jobs.Consumer, error) {
-	return boltjobs.FromPipeline(pipe, p.log, p.cfg, queue)
+// DriverFromPipeline constructs kafka driver from pipeline
+func (p *Plugin) DriverFromPipeline(pipe jobs.Pipeline, pq pq.Queue, cmder chan<- jobs.Commander) (jobs.Driver, error) {
+	return boltjobs.FromPipeline(pipe, p.log, p.cfg, pq, cmder)
 }

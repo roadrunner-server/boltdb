@@ -9,13 +9,15 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/roadrunner-server/api/v3/plugins/v1/jobs"
-	pq "github.com/roadrunner-server/api/v3/plugins/v1/priority_queue"
+	"github.com/roadrunner-server/api/v4/plugins/v1/jobs"
+	pq "github.com/roadrunner-server/api/v4/plugins/v1/priority_queue"
 	"github.com/roadrunner-server/errors"
 	"github.com/roadrunner-server/sdk/v4/utils"
 	bolt "go.etcd.io/bbolt"
 	"go.uber.org/zap"
 )
+
+var _ jobs.Driver = (*Driver)(nil)
 
 const (
 	name string = "boltdb"
@@ -33,7 +35,7 @@ type Configurer interface {
 	Has(name string) bool
 }
 
-type Consumer struct {
+type Driver struct {
 	file        string
 	permissions int
 	priority    int64
@@ -54,7 +56,7 @@ type Consumer struct {
 	stopCh chan struct{}
 }
 
-func NewBoltDBJobs(configKey string, log *zap.Logger, cfg Configurer, pq pq.Queue) (*Consumer, error) {
+func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq pq.Queue, _ chan<- jobs.Commander) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	if !cfg.Has(configKey) {
@@ -97,7 +99,7 @@ func NewBoltDBJobs(configKey string, log *zap.Logger, cfg Configurer, pq pq.Queu
 		return nil, errors.E(op, err)
 	}
 
-	return &Consumer{
+	dr := &Driver{
 		permissions: localCfg.Permissions,
 		file:        localCfg.File,
 		priority:    localCfg.Priority,
@@ -115,10 +117,14 @@ func NewBoltDBJobs(configKey string, log *zap.Logger, cfg Configurer, pq pq.Queu
 		log:    log,
 		pq:     pq,
 		stopCh: make(chan struct{}),
-	}, nil
+	}
+
+	dr.pipeline.Store(&pipe)
+
+	return dr, nil
 }
 
-func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq.Queue) (*Consumer, error) {
+func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq.Queue, _ chan<- jobs.Commander) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	// if no global section
@@ -154,7 +160,7 @@ func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq
 		return nil, errors.E(op, err)
 	}
 
-	return &Consumer{
+	dr := &Driver{
 		file:        pipeline.String(file, rrDB),
 		priority:    pipeline.Priority(),
 		prefetch:    pipeline.Int(prefetch, 1000),
@@ -172,26 +178,30 @@ func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq
 		log:    log,
 		pq:     pq,
 		stopCh: make(chan struct{}),
-	}, nil
+	}
+
+	dr.pipeline.Store(&pipeline)
+
+	return dr, nil
 }
 
-func (c *Consumer) Push(_ context.Context, job jobs.Job) error {
+func (d *Driver) Push(_ context.Context, job jobs.Job) error {
 	const op = errors.Op("boltdb_jobs_push")
-	err := c.db.Update(func(tx *bolt.Tx) error {
+	err := d.db.Update(func(tx *bolt.Tx) error {
 		item := fromJob(job)
 		// pool with buffers
-		buf := c.get()
+		buf := d.get()
 		// encode the job
 		enc := gob.NewEncoder(buf)
 		err := enc.Encode(item)
 		if err != nil {
-			c.put(buf)
+			d.put(buf)
 			return errors.E(op, err)
 		}
 
 		value := make([]byte, buf.Len())
 		copy(value, buf.Bytes())
-		c.put(buf)
+		d.put(buf)
 
 		// handle delay
 		if item.Options.Delay > 0 {
@@ -203,7 +213,7 @@ func (c *Consumer) Push(_ context.Context, job jobs.Job) error {
 				return errors.E(op, err)
 			}
 
-			atomic.AddUint64(c.delayed, 1)
+			atomic.AddUint64(d.delayed, 1)
 
 			return nil
 		}
@@ -215,7 +225,7 @@ func (c *Consumer) Push(_ context.Context, job jobs.Job) error {
 		}
 
 		// increment active counter
-		atomic.AddUint64(c.active, 1)
+		atomic.AddUint64(d.active, 1)
 
 		return nil
 	})
@@ -227,99 +237,96 @@ func (c *Consumer) Push(_ context.Context, job jobs.Job) error {
 	return nil
 }
 
-func (c *Consumer) Register(_ context.Context, pipeline jobs.Pipeline) error {
-	c.pipeline.Store(&pipeline)
-	return nil
-}
-
-func (c *Consumer) Run(_ context.Context, p jobs.Pipeline) error {
+func (d *Driver) Run(_ context.Context, p jobs.Pipeline) error {
 	const op = errors.Op("boltdb_run")
 	start := time.Now()
 
-	pipe := *c.pipeline.Load()
+	pipe := *d.pipeline.Load()
 	if pipe.Name() != p.Name() {
 		return errors.E(op, errors.Errorf("no such pipeline registered: %s", pipe.Name()))
 	}
 
 	// run listener
-	go c.listener()
-	go c.delayedJobsListener()
+	go d.listener()
+	go d.delayedJobsListener()
 
 	// increase number of listeners
-	atomic.AddUint32(&c.listeners, 1)
-	c.log.Debug("pipeline is active", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	atomic.AddUint32(&d.listeners, 1)
+	d.log.Debug("pipeline is active", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 	return nil
 }
 
-func (c *Consumer) Stop(_ context.Context) error {
+func (d *Driver) Stop(_ context.Context) error {
 	start := time.Now()
-	if atomic.LoadUint32(&c.listeners) > 0 {
-		c.stopCh <- struct{}{}
-		c.stopCh <- struct{}{}
+	if atomic.LoadUint32(&d.listeners) > 0 {
+		d.stopCh <- struct{}{}
+		d.stopCh <- struct{}{}
 	}
 
-	pipe := *c.pipeline.Load()
-	c.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
-	return c.db.Close()
+	pipe := *d.pipeline.Load()
+	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	return d.db.Close()
 }
 
-func (c *Consumer) Pause(_ context.Context, p string) {
+func (d *Driver) Pause(_ context.Context, p string) error {
 	start := time.Now()
-	pipe := *c.pipeline.Load()
+	pipe := *d.pipeline.Load()
 	if pipe.Name() != p {
-		c.log.Error("no such pipeline", zap.String("pause was requested", p))
+		return errors.Errorf("no such pipeline: %s", pipe.Name())
 	}
 
-	l := atomic.LoadUint32(&c.listeners)
+	l := atomic.LoadUint32(&d.listeners)
 	// no active listeners
 	if l == 0 {
-		c.log.Warn("no active listeners, nothing to pause")
-		return
+		return errors.Str("no active listeners, nothing to pause")
 	}
 
-	c.stopCh <- struct{}{}
-	c.stopCh <- struct{}{}
+	d.stopCh <- struct{}{}
+	d.stopCh <- struct{}{}
 
-	atomic.AddUint32(&c.listeners, ^uint32(0))
+	atomic.AddUint32(&d.listeners, ^uint32(0))
 
-	c.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+
+	return nil
 }
 
-func (c *Consumer) Resume(_ context.Context, p string) {
+func (d *Driver) Resume(_ context.Context, p string) error {
 	start := time.Now()
-	pipe := *c.pipeline.Load()
+	pipe := *d.pipeline.Load()
 	if pipe.Name() != p {
-		c.log.Error("no such pipeline", zap.String("resume was requested", p))
+		return errors.Errorf("no such pipeline: %s", pipe.Name())
 	}
 
-	l := atomic.LoadUint32(&c.listeners)
+	l := atomic.LoadUint32(&d.listeners)
 	// no active listeners
 	if l == 1 {
-		c.log.Warn("amqp listener already in the active state")
-		return
+		return errors.Str("boltdb listener is already in the active state")
 	}
 
 	// run listener
-	go c.listener()
-	go c.delayedJobsListener()
+	go d.listener()
+	go d.delayedJobsListener()
 
 	// increase number of listeners
-	atomic.AddUint32(&c.listeners, 1)
+	atomic.AddUint32(&d.listeners, 1)
 
-	c.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+
+	return nil
 }
 
-func (c *Consumer) State(_ context.Context) (*jobs.State, error) {
-	pipe := *c.pipeline.Load()
+func (d *Driver) State(_ context.Context) (*jobs.State, error) {
+	pipe := *d.pipeline.Load()
 
 	return &jobs.State{
 		Pipeline: pipe.Name(),
 		Driver:   pipe.Driver(),
 		Queue:    PushBucket,
 		Priority: uint64(pipe.Priority()),
-		Active:   int64(atomic.LoadUint64(c.active)),
-		Delayed:  int64(atomic.LoadUint64(c.delayed)),
-		Ready:    toBool(atomic.LoadUint32(&c.listeners)),
+		Active:   int64(atomic.LoadUint64(d.active)),
+		Delayed:  int64(atomic.LoadUint64(d.delayed)),
+		Ready:    toBool(atomic.LoadUint32(&d.listeners)),
 	}, nil
 }
 
@@ -366,13 +373,13 @@ func create(db *bolt.DB) error {
 	return nil
 }
 
-func (c *Consumer) get() *bytes.Buffer {
-	return c.bPool.Get().(*bytes.Buffer)
+func (d *Driver) get() *bytes.Buffer {
+	return d.bPool.Get().(*bytes.Buffer)
 }
 
-func (c *Consumer) put(b *bytes.Buffer) {
+func (d *Driver) put(b *bytes.Buffer) {
 	b.Reset()
-	c.bPool.Put(b)
+	d.bPool.Put(b)
 }
 
 func toBool(r uint32) bool {
