@@ -17,7 +17,7 @@ func (tl *testLog) NamedLogger(string) *zap.Logger {
 
 func TestPluginInit(t *testing.T) {
 	p := Plugin{}
-	require.Error(t, p.Init(&testLog{}, &Cfg{}))
+	require.NoError(t, p.Init(&testLog{}, &Cfg{}))
 }
 
 func TestPluginName(t *testing.T) {
