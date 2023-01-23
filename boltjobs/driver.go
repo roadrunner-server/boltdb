@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/gob"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -37,7 +38,7 @@ type Configurer interface {
 
 type Driver struct {
 	file        string
-	permissions int
+	permissions int64
 	priority    int64
 	prefetch    int
 
@@ -59,17 +60,8 @@ type Driver struct {
 func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq pq.Queue, _ chan<- jobs.Commander) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
-	if !cfg.Has(configKey) {
-		return nil, errors.E(op, errors.Errorf("no configuration by provided key: %s", configKey))
-	}
-
 	var localCfg config
-	err := cfg.UnmarshalKey(name, &localCfg)
-	if err != nil {
-		return nil, errors.E(op, err)
-	}
-
-	err = cfg.UnmarshalKey(configKey, &localCfg)
+	err := cfg.UnmarshalKey(configKey, &localCfg)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -91,14 +83,16 @@ func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pip
 	}
 
 	dr := &Driver{
-		permissions: localCfg.Permissions,
+		permissions: int64(localCfg.Permissions),
 		file:        localCfg.File,
 		priority:    localCfg.Priority,
 		prefetch:    localCfg.Prefetch,
 
-		bPool: sync.Pool{New: func() any {
-			return new(bytes.Buffer)
-		}},
+		bPool: sync.Pool{
+			New: func() any {
+				return new(bytes.Buffer)
+			},
+		},
 		cond: sync.NewCond(&sync.Mutex{}),
 
 		delayed: utils.Uint64(0),
@@ -118,26 +112,24 @@ func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pip
 func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq.Queue, _ chan<- jobs.Commander) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
-	// if no global section
-	if !cfg.Has(name) {
-		return nil, errors.E(op, errors.Str("no global boltdb configuration"))
-	}
-
 	var conf config
 	err := cfg.UnmarshalKey(name, conf)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
+	var perm int64
+	perm, err = strconv.ParseInt(pipeline.String(permissions, "0777"), 8, 64)
+	if err != nil {
+		log.Warn("failed to parse permissions, fallback to default 0777", zap.String("provided", pipeline.String(permissions, "")))
+		perm = 511 // 0777
+	}
+
 	// add default values
 	conf.InitDefaults()
 
-	db, err := bolt.Open(pipeline.String(file, rrDB), os.FileMode(conf.Permissions), &bolt.Options{
-		Timeout:        time.Second * 20,
-		NoGrowSync:     false,
-		NoFreelistSync: false,
-		ReadOnly:       false,
-		NoSync:         false,
+	db, err := bolt.Open(pipeline.String(file, rrDB), os.FileMode(perm), &bolt.Options{
+		Timeout: time.Second * 20,
 	})
 
 	if err != nil {
@@ -155,7 +147,7 @@ func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq
 		file:        pipeline.String(file, rrDB),
 		priority:    pipeline.Priority(),
 		prefetch:    pipeline.Int(prefetch, 1000),
-		permissions: conf.Permissions,
+		permissions: perm,
 
 		bPool: sync.Pool{New: func() any {
 			return new(bytes.Buffer)

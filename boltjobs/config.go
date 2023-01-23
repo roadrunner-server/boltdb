@@ -1,8 +1,9 @@
 package boltjobs
 
 const (
-	file     string = "file"
-	prefetch string = "prefetch"
+	file        string = "file"
+	prefetch    string = "prefetch"
+	permissions string = "permissions"
 )
 
 type config struct {
