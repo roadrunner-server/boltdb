@@ -6,13 +6,10 @@ const (
 )
 
 type config struct {
-	// global
-	Permissions int `mapstructure:"permissions"`
-
-	// local
-	File     string `mapstructure:"file"`
-	Priority int64  `mapstructure:"priority"`
-	Prefetch int    `mapstructure:"prefetch"`
+	Permissions int    `mapstructure:"permissions"`
+	File        string `mapstructure:"file"`
+	Priority    int64  `mapstructure:"priority"`
+	Prefetch    int    `mapstructure:"prefetch"`
 }
 
 func (c *config) InitDefaults() {

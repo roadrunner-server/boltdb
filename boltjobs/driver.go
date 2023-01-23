@@ -63,11 +63,6 @@ func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pip
 		return nil, errors.E(op, errors.Errorf("no configuration by provided key: %s", configKey))
 	}
 
-	// if no global section
-	if !cfg.Has(name) {
-		return nil, errors.E(op, errors.Str("no global boltdb configuration"))
-	}
-
 	var localCfg config
 	err := cfg.UnmarshalKey(name, &localCfg)
 	if err != nil {
@@ -81,11 +76,7 @@ func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pip
 
 	localCfg.InitDefaults()
 	db, err := bolt.Open(localCfg.File, os.FileMode(localCfg.Permissions), &bolt.Options{
-		Timeout:        time.Second * 20,
-		NoGrowSync:     false,
-		NoFreelistSync: false,
-		ReadOnly:       false,
-		NoSync:         false,
+		Timeout: time.Second * 20,
 	})
 
 	if err != nil {

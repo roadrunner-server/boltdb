@@ -33,10 +33,6 @@ type Plugin struct {
 }
 
 func (p *Plugin) Init(log Logger, cfg Configurer) error {
-	if !cfg.Has(PluginName) {
-		return errors.E(errors.Disabled)
-	}
-
 	p.log = log.NamedLogger(PluginName)
 	p.cfg = cfg
 	return nil
