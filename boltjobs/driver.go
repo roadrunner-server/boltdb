@@ -21,8 +21,8 @@ import (
 var _ jobs.Driver = (*Driver)(nil)
 
 const (
-	name string = "boltdb"
-	rrDB string = "rr.db"
+	pluginName string = "boltdb"
+	rrDB       string = "rr.db"
 
 	PushBucket    string = "push"
 	InQueueBucket string = "processing"
@@ -113,7 +113,7 @@ func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq
 	const op = errors.Op("init_boltdb_jobs")
 
 	var conf config
-	err := cfg.UnmarshalKey(name, conf)
+	err := cfg.UnmarshalKey(pluginName, conf)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
