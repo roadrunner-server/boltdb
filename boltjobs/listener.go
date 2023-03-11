@@ -2,12 +2,15 @@ package boltjobs
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"sync/atomic"
 	"time"
 
 	"github.com/roadrunner-server/sdk/v4/utils"
 	bolt "go.etcd.io/bbolt"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	"go.uber.org/zap"
 )
 
@@ -50,6 +53,9 @@ func (d *Driver) listener() { //nolint:gocognit
 				continue
 			}
 
+			ctx := d.prop.Extract(context.Background(), propagation.HeaderCarrier(item.Headers))
+			ctx, span := d.tracer.Tracer(tracerName).Start(ctx, "boltdb_listener")
+
 			if item.Options.Priority == 0 {
 				item.Options.Priority = d.priority
 			}
@@ -64,6 +70,11 @@ func (d *Driver) listener() { //nolint:gocognit
 				err = inQb.Put(utils.AsBytes(item.ID()), v)
 				if err != nil {
 					d.rollback(err, tx)
+					span.SetAttributes(attribute.KeyValue{
+						Key:   "error",
+						Value: attribute.StringValue(err.Error()),
+					})
+					span.End()
 					continue
 				}
 			}
@@ -72,19 +83,31 @@ func (d *Driver) listener() { //nolint:gocognit
 			err = b.Delete(k)
 			if err != nil {
 				d.rollback(err, tx)
+				span.SetAttributes(attribute.KeyValue{
+					Key:   "error",
+					Value: attribute.StringValue(err.Error()),
+				})
+				span.End()
 				continue
 			}
 
 			err = tx.Commit()
 			if err != nil {
 				d.rollback(err, tx)
+				span.SetAttributes(attribute.KeyValue{
+					Key:   "error",
+					Value: attribute.StringValue(err.Error()),
+				})
+				span.End()
 				continue
 			}
 
+			d.prop.Inject(ctx, propagation.HeaderCarrier(item.Headers))
 			// attach pointer to the DB
 			item.attachDB(d.db, d.active, d.delayed)
 			// as the last step, after commit, put the item into the PQ
 			d.pq.Insert(item)
+			span.End()
 		}
 	}
 }
