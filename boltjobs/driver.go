@@ -15,6 +15,11 @@ import (
 	"github.com/roadrunner-server/errors"
 	"github.com/roadrunner-server/sdk/v4/utils"
 	bolt "go.etcd.io/bbolt"
+	jprop "go.opentelemetry.io/contrib/propagators/jaeger"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 )
 
@@ -27,6 +32,8 @@ const (
 	PushBucket    string = "push"
 	InQueueBucket string = "processing"
 	DelayBucket   string = "delayed"
+
+	tracerName string = "jobs"
 )
 
 type Configurer interface {
@@ -41,6 +48,8 @@ type Driver struct {
 	permissions int64
 	priority    int64
 	prefetch    int
+	tracer      *sdktrace.TracerProvider
+	prop        propagation.TextMapPropagator
 
 	db *bolt.DB
 
@@ -57,7 +66,7 @@ type Driver struct {
 	stopCh chan struct{}
 }
 
-func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq pq.Queue, _ chan<- jobs.Commander) (*Driver, error) {
+func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq pq.Queue) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	var localCfg config
@@ -65,6 +74,13 @@ func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pip
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	if tracer == nil {
+		tracer = sdktrace.NewTracerProvider()
+	}
+
+	prop := propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}, jprop.Jaeger{})
+	otel.SetTextMapPropagator(prop)
 
 	localCfg.InitDefaults()
 	db, err := bolt.Open(localCfg.File, os.FileMode(localCfg.Permissions), &bolt.Options{
@@ -83,6 +99,8 @@ func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pip
 	}
 
 	dr := &Driver{
+		tracer:      tracer,
+		prop:        prop,
 		permissions: int64(localCfg.Permissions),
 		file:        localCfg.File,
 		priority:    localCfg.Priority,
@@ -109,7 +127,7 @@ func FromConfig(configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pip
 	return dr, nil
 }
 
-func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq.Queue, _ chan<- jobs.Commander) (*Driver, error) {
+func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq.Queue) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	var conf config
@@ -117,6 +135,13 @@ func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
+
+	if tracer == nil {
+		tracer = sdktrace.NewTracerProvider()
+	}
+
+	prop := propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}, jprop.Jaeger{})
+	otel.SetTextMapPropagator(prop)
 
 	var perm int64
 	perm, err = strconv.ParseInt(pipeline.String(permissions, "0777"), 8, 64)
@@ -144,6 +169,8 @@ func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq
 	}
 
 	dr := &Driver{
+		tracer:      tracer,
+		prop:        prop,
 		file:        pipeline.String(file, rrDB),
 		priority:    pipeline.Priority(),
 		prefetch:    pipeline.Int(prefetch, 1000),
@@ -168,10 +195,15 @@ func FromPipeline(pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq
 	return dr, nil
 }
 
-func (d *Driver) Push(_ context.Context, job jobs.Job) error {
+func (d *Driver) Push(ctx context.Context, job jobs.Job) error {
 	const op = errors.Op("boltdb_jobs_push")
+
+	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "boltdb_push")
+	defer span.End()
+
 	err := d.db.Update(func(tx *bolt.Tx) error {
 		item := fromJob(job)
+		d.prop.Inject(ctx, propagation.HeaderCarrier(item.Headers))
 		// pool with buffers
 		buf := d.get()
 		// encode the job
@@ -220,9 +252,12 @@ func (d *Driver) Push(_ context.Context, job jobs.Job) error {
 	return nil
 }
 
-func (d *Driver) Run(_ context.Context, p jobs.Pipeline) error {
+func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 	const op = errors.Op("boltdb_run")
-	start := time.Now()
+	start := time.Now().UTC()
+
+	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "boltdb_run")
+	defer span.End()
 
 	pipe := *d.pipeline.Load()
 	if pipe.Name() != p.Name() {
@@ -239,8 +274,12 @@ func (d *Driver) Run(_ context.Context, p jobs.Pipeline) error {
 	return nil
 }
 
-func (d *Driver) Stop(_ context.Context) error {
-	start := time.Now()
+func (d *Driver) Stop(ctx context.Context) error {
+	start := time.Now().UTC()
+
+	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "boltdb_stop")
+	defer span.End()
+
 	if atomic.LoadUint32(&d.listeners) > 0 {
 		d.stopCh <- struct{}{}
 		d.stopCh <- struct{}{}
@@ -251,8 +290,12 @@ func (d *Driver) Stop(_ context.Context) error {
 	return d.db.Close()
 }
 
-func (d *Driver) Pause(_ context.Context, p string) error {
-	start := time.Now()
+func (d *Driver) Pause(ctx context.Context, p string) error {
+	start := time.Now().UTC()
+
+	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "boltdb_pause")
+	defer span.End()
+
 	pipe := *d.pipeline.Load()
 	if pipe.Name() != p {
 		return errors.Errorf("no such pipeline: %s", pipe.Name())
@@ -274,8 +317,12 @@ func (d *Driver) Pause(_ context.Context, p string) error {
 	return nil
 }
 
-func (d *Driver) Resume(_ context.Context, p string) error {
-	start := time.Now()
+func (d *Driver) Resume(ctx context.Context, p string) error {
+	start := time.Now().UTC()
+
+	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "boltdb_resume")
+	defer span.End()
+
 	pipe := *d.pipeline.Load()
 	if pipe.Name() != p {
 		return errors.Errorf("no such pipeline: %s", pipe.Name())
@@ -299,8 +346,11 @@ func (d *Driver) Resume(_ context.Context, p string) error {
 	return nil
 }
 
-func (d *Driver) State(_ context.Context) (*jobs.State, error) {
+func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 	pipe := *d.pipeline.Load()
+
+	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "boltdb_state")
+	defer span.End()
 
 	return &jobs.State{
 		Pipeline: pipe.Name(),
