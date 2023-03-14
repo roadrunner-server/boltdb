@@ -53,6 +53,9 @@ func (d *Driver) listener() { //nolint:gocognit
 				continue
 			}
 
+			item.Options.Pipeline = (*d.pipeline.Load()).Name()
+			item.Options.Queue = PushBucket
+
 			ctx := d.prop.Extract(context.Background(), propagation.HeaderCarrier(item.Headers))
 			ctx, span := d.tracer.Tracer(tracerName).Start(ctx, "boltdb_listener")
 
