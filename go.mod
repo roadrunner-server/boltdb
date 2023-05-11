@@ -5,9 +5,9 @@ go 1.20
 require (
 	github.com/goccy/go-json v0.10.2
 	github.com/roadrunner-server/api/v4 v4.3.2
-	github.com/roadrunner-server/endure/v2 v2.2.0
+	github.com/roadrunner-server/endure/v2 v2.2.1
 	github.com/roadrunner-server/errors v1.2.0
-	github.com/roadrunner-server/sdk/v4 v4.2.2
+	github.com/roadrunner-server/sdk/v4 v4.2.3
 	github.com/stretchr/testify v1.8.2
 	go.etcd.io/bbolt v1.3.7
 	go.opentelemetry.io/contrib/propagators/jaeger v1.16.1
