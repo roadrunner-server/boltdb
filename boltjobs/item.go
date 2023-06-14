@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
-	"github.com/roadrunner-server/api/v4/plugins/v1/jobs"
+	"github.com/roadrunner-server/api/v4/plugins/v2/jobs"
 	"github.com/roadrunner-server/errors"
 	"github.com/roadrunner-server/sdk/v4/utils"
 	"go.etcd.io/bbolt"
@@ -21,7 +21,7 @@ type Item struct {
 	// Payload is string data (usually JSON) passed to Job broker.
 	Payload string `json:"payload"`
 	// Headers with key-values pairs
-	Headers map[string][]string `json:"headers"`
+	headers map[string][]string
 	// Options contains set of PipelineOptions specific to job execution. Can be empty.
 	Options *Options `json:"options,omitempty"`
 }
@@ -54,8 +54,12 @@ func (i *Item) Priority() int64 {
 	return i.Options.Priority
 }
 
-func (i *Item) Metadata() map[string][]string {
-	return i.Headers
+func (i *Item) PipelineID() string {
+	return i.Options.Pipeline
+}
+
+func (i *Item) Headers() map[string][]string {
+	return i.headers
 }
 
 func (i *Item) Body() []byte {
@@ -75,7 +79,7 @@ func (i *Item) Context() ([]byte, error) {
 			ID:       i.Ident,
 			Job:      i.Job,
 			Driver:   pluginName,
-			Headers:  i.Headers,
+			Headers:  i.headers,
 			Queue:    i.Options.Queue,
 			Pipeline: i.Options.Pipeline,
 		},
@@ -177,7 +181,7 @@ Requeue algorithm:
 */
 func (i *Item) Requeue(headers map[string][]string, delay int64) error {
 	const op = errors.Op("boltdb_item_requeue")
-	i.Headers = headers
+	i.headers = headers
 	i.Options.Delay = delay
 
 	tx, err := i.Options.db.Begin(true)
@@ -246,16 +250,16 @@ func (i *Item) rollback(err error, tx *bbolt.Tx) error {
 	return errors.Errorf("transaction commit error: %v", err)
 }
 
-func fromJob(job jobs.Job) *Item {
+func fromJob(job jobs.Message) *Item {
 	return &Item{
 		Job:     job.Name(),
 		Ident:   job.ID(),
 		Payload: job.Payload(),
-		Headers: job.Headers(),
+		headers: job.Headers(),
 		Options: &Options{
 			AutoAck:  job.AutoAck(),
 			Priority: job.Priority(),
-			Pipeline: job.Pipeline(),
+			Pipeline: job.PipelineID(),
 			Delay:    job.Delay(),
 		},
 	}

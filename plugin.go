@@ -1,9 +1,8 @@
 package boltdb
 
 import (
-	"github.com/roadrunner-server/api/v4/plugins/v1/jobs"
 	"github.com/roadrunner-server/api/v4/plugins/v1/kv"
-	pq "github.com/roadrunner-server/api/v4/plugins/v1/priority_queue"
+	"github.com/roadrunner-server/api/v4/plugins/v2/jobs"
 	"github.com/roadrunner-server/boltdb/v4/boltjobs"
 	"github.com/roadrunner-server/boltdb/v4/boltkv"
 	"github.com/roadrunner-server/endure/v2/dep"
@@ -71,11 +70,11 @@ func (p *Plugin) KvFromConfig(key string) (kv.Storage, error) {
 // JOBS bbolt implementation
 
 // DriverFromConfig constructs kafka driver from the .rr.yaml configuration
-func (p *Plugin) DriverFromConfig(configKey string, pq pq.Queue, pipeline jobs.Pipeline, _ chan<- jobs.Commander) (jobs.Driver, error) {
+func (p *Plugin) DriverFromConfig(configKey string, pq jobs.Queue, pipeline jobs.Pipeline, _ chan<- jobs.Commander) (jobs.Driver, error) {
 	return boltjobs.FromConfig(p.tracer, configKey, p.log, p.cfg, pipeline, pq)
 }
 
 // DriverFromPipeline constructs kafka driver from pipeline
-func (p *Plugin) DriverFromPipeline(pipe jobs.Pipeline, pq pq.Queue, _ chan<- jobs.Commander) (jobs.Driver, error) {
+func (p *Plugin) DriverFromPipeline(pipe jobs.Pipeline, pq jobs.Queue, _ chan<- jobs.Commander) (jobs.Driver, error) {
 	return boltjobs.FromPipeline(p.tracer, pipe, p.log, p.cfg, pq)
 }

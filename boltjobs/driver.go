@@ -10,8 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/roadrunner-server/api/v4/plugins/v1/jobs"
-	pq "github.com/roadrunner-server/api/v4/plugins/v1/priority_queue"
+	"github.com/roadrunner-server/api/v4/plugins/v2/jobs"
 	"github.com/roadrunner-server/errors"
 	"github.com/roadrunner-server/sdk/v4/utils"
 	bolt "go.etcd.io/bbolt"
@@ -55,7 +54,7 @@ type Driver struct {
 
 	bPool    sync.Pool
 	log      *zap.Logger
-	pq       pq.Queue
+	pq       jobs.Queue
 	pipeline atomic.Pointer[jobs.Pipeline]
 	cond     *sync.Cond
 
@@ -66,7 +65,7 @@ type Driver struct {
 	stopCh chan struct{}
 }
 
-func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq pq.Queue) (*Driver, error) {
+func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	var localCfg config
@@ -127,7 +126,7 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logg
 	return dr, nil
 }
 
-func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq pq.Queue) (*Driver, error) {
+func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	var conf config
@@ -195,7 +194,7 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *
 	return dr, nil
 }
 
-func (d *Driver) Push(ctx context.Context, job jobs.Job) error {
+func (d *Driver) Push(ctx context.Context, job jobs.Message) error {
 	const op = errors.Op("boltdb_jobs_push")
 
 	ctx, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "boltdb_push")
@@ -203,7 +202,7 @@ func (d *Driver) Push(ctx context.Context, job jobs.Job) error {
 
 	err := d.db.Update(func(tx *bolt.Tx) error {
 		item := fromJob(job)
-		d.prop.Inject(ctx, propagation.HeaderCarrier(item.Headers))
+		d.prop.Inject(ctx, propagation.HeaderCarrier(item.headers))
 		// pool with buffers
 		buf := d.get()
 		// encode the job
