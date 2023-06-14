@@ -138,6 +138,8 @@ func (d *Driver) delayedJobsListener() { //nolint:gocognit
 		select {
 		case <-d.stopCh:
 			d.log.Debug("boltdb listener stopped")
+			// on stop - remove all associated item from the PQ
+			_ = d.pq.Remove((*d.pipeline.Load()).Name())
 			return
 		case <-tt.C:
 			tx, err := d.db.Begin(true)

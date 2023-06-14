@@ -269,7 +269,7 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 
 	// increase number of listeners
 	atomic.AddUint32(&d.listeners, 1)
-	d.log.Debug("pipeline is active", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 	return nil
 }
 
