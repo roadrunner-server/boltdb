@@ -14,13 +14,15 @@ import (
 	"go.uber.org/zap"
 )
 
-func (d *Driver) listener() { //nolint:gocognit
+func (d *Driver) listener() {
 	tt := time.NewTicker(time.Millisecond * 500)
 	defer tt.Stop()
 	for {
 		select {
 		case <-d.stopCh:
 			d.log.Debug("boltdb listener stopped")
+			// on stop - remove all associated item from the PQ
+			_ = d.pq.Remove((*d.pipeline.Load()).Name())
 			return
 		case <-tt.C:
 			if atomic.LoadUint64(d.active) > uint64(d.prefetch) {
@@ -56,7 +58,7 @@ func (d *Driver) listener() { //nolint:gocognit
 			item.Options.Pipeline = (*d.pipeline.Load()).Name()
 			item.Options.Queue = PushBucket
 
-			ctx := d.prop.Extract(context.Background(), propagation.HeaderCarrier(item.Headers))
+			ctx := d.prop.Extract(context.Background(), propagation.HeaderCarrier(item.headers))
 			ctx, span := d.tracer.Tracer(tracerName).Start(ctx, "boltdb_listener")
 
 			if item.Options.Priority == 0 {
@@ -105,7 +107,11 @@ func (d *Driver) listener() { //nolint:gocognit
 				continue
 			}
 
-			d.prop.Inject(ctx, propagation.HeaderCarrier(item.Headers))
+			if item.headers == nil {
+				item.headers = make(map[string][]string, 2)
+			}
+
+			d.prop.Inject(ctx, propagation.HeaderCarrier(item.headers))
 			// attach pointer to the DB
 			item.attachDB(d.db, d.active, d.delayed)
 			// as the last step, after commit, put the item into the PQ
@@ -132,6 +138,8 @@ func (d *Driver) delayedJobsListener() { //nolint:gocognit
 		select {
 		case <-d.stopCh:
 			d.log.Debug("boltdb listener stopped")
+			// on stop - remove all associated item from the PQ
+			_ = d.pq.Remove((*d.pipeline.Load()).Name())
 			return
 		case <-tt.C:
 			tx, err := d.db.Begin(true)
