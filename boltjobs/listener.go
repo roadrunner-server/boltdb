@@ -7,7 +7,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/roadrunner-server/sdk/v4/utils"
 	bolt "go.etcd.io/bbolt"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
@@ -35,8 +34,8 @@ func (d *Driver) listener() {
 				continue
 			}
 
-			b := tx.Bucket(utils.AsBytes(PushBucket))
-			inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
+			b := tx.Bucket(strToBytes(PushBucket))
+			inQb := tx.Bucket(strToBytes(InQueueBucket))
 
 			// get first item
 			k, v := b.Cursor().First()
@@ -72,7 +71,7 @@ func (d *Driver) listener() {
 
 			// If AutoAck is false, put the job into the safe DB
 			if !item.Options.AutoAck {
-				err = inQb.Put(utils.AsBytes(item.ID()), v)
+				err = inQb.Put(strToBytes(item.ID()), v)
 				if err != nil {
 					d.rollback(err, tx)
 					span.SetAttributes(attribute.KeyValue{
@@ -132,7 +131,7 @@ func (d *Driver) delayedJobsListener() { //nolint:gocognit
 		return
 	}
 
-	var startDate = utils.AsBytes(time.Date(1990, 1, 1, 0, 0, 0, 0, loc).Format(time.RFC3339))
+	var startDate = strToBytes(time.Date(1990, 1, 1, 0, 0, 0, 0, loc).Format(time.RFC3339))
 
 	for {
 		select {
@@ -148,11 +147,11 @@ func (d *Driver) delayedJobsListener() { //nolint:gocognit
 				continue
 			}
 
-			delayB := tx.Bucket(utils.AsBytes(DelayBucket))
-			inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
+			delayB := tx.Bucket(strToBytes(DelayBucket))
+			inQb := tx.Bucket(strToBytes(InQueueBucket))
 
 			cursor := delayB.Cursor()
-			endDate := utils.AsBytes(time.Now().UTC().Format(time.RFC3339))
+			endDate := strToBytes(time.Now().UTC().Format(time.RFC3339))
 
 			for k, v := cursor.Seek(startDate); k != nil && bytes.Compare(k, endDate) <= 0; k, v = cursor.Next() {
 				buf := bytes.NewReader(v)
@@ -176,7 +175,7 @@ func (d *Driver) delayedJobsListener() { //nolint:gocognit
 
 				// If AutoAck is false, put the job into the safe DB
 				if !item.Options.AutoAck {
-					err = inQb.Put(utils.AsBytes(item.ID()), v)
+					err = inQb.Put(strToBytes(item.ID()), v)
 					if err != nil {
 						d.rollback(err, tx)
 						continue

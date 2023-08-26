@@ -10,9 +10,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/roadrunner-server/api/v4/plugins/v2/jobs"
+	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/sdk/v4/utils"
 	bolt "go.etcd.io/bbolt"
 	jprop "go.opentelemetry.io/contrib/propagators/jaeger"
 	"go.opentelemetry.io/otel"
@@ -112,8 +111,8 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logg
 		},
 		cond: sync.NewCond(&sync.Mutex{}),
 
-		delayed: utils.Uint64(0),
-		active:  utils.Uint64(0),
+		delayed: toPtr(uint64(0)),
+		active:  toPtr(uint64(0)),
 
 		db:     db,
 		log:    log,
@@ -180,8 +179,8 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *
 		}},
 		cond: sync.NewCond(&sync.Mutex{}),
 
-		delayed: utils.Uint64(0),
-		active:  utils.Uint64(0),
+		delayed: toPtr(uint64(0)),
+		active:  toPtr(uint64(0)),
 
 		db:     db,
 		log:    log,
@@ -219,10 +218,10 @@ func (d *Driver) Push(ctx context.Context, job jobs.Message) error {
 
 		// handle delay
 		if item.Options.Delay > 0 {
-			b := tx.Bucket(utils.AsBytes(DelayBucket))
+			b := tx.Bucket(strToBytes(DelayBucket))
 			tKey := time.Now().UTC().Add(time.Second * time.Duration(item.Options.Delay)).Format(time.RFC3339)
 
-			err = b.Put(utils.AsBytes(tKey), value)
+			err = b.Put(strToBytes(tKey), value)
 			if err != nil {
 				return errors.E(op, err)
 			}
@@ -232,8 +231,8 @@ func (d *Driver) Push(ctx context.Context, job jobs.Message) error {
 			return nil
 		}
 
-		b := tx.Bucket(utils.AsBytes(PushBucket))
-		err = b.Put(utils.AsBytes(item.ID()), value)
+		b := tx.Bucket(strToBytes(PushBucket))
+		err = b.Put(strToBytes(item.ID()), value)
 		if err != nil {
 			return errors.E(op, err)
 		}
@@ -367,25 +366,25 @@ func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 func create(db *bolt.DB) error {
 	err := db.Update(func(tx *bolt.Tx) error {
 		const upOp = errors.Op("boltdb_plugin_update")
-		_, err := tx.CreateBucketIfNotExists(utils.AsBytes(DelayBucket))
+		_, err := tx.CreateBucketIfNotExists(strToBytes(DelayBucket))
 		if err != nil {
 			return errors.E(upOp, err)
 		}
 
-		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(PushBucket))
+		_, err = tx.CreateBucketIfNotExists(strToBytes(PushBucket))
 		if err != nil {
 			return errors.E(upOp, err)
 		}
 
-		_, err = tx.CreateBucketIfNotExists(utils.AsBytes(InQueueBucket))
+		_, err = tx.CreateBucketIfNotExists(strToBytes(InQueueBucket))
 		if err != nil {
 			return errors.E(upOp, err)
 		}
 
-		inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
+		inQb := tx.Bucket(strToBytes(InQueueBucket))
 		cursor := inQb.Cursor()
 
-		pushB := tx.Bucket(utils.AsBytes(PushBucket))
+		pushB := tx.Bucket(strToBytes(PushBucket))
 
 		// get all items, which are in the InQueueBucket and put them into the PushBucket
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
@@ -416,4 +415,8 @@ func (d *Driver) put(b *bytes.Buffer) {
 
 func toBool(r uint32) bool {
 	return r > 0
+}
+
+func toPtr[T any](v T) *T {
+	return &v
 }

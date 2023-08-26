@@ -2,7 +2,7 @@ package boltdb
 
 import (
 	"github.com/roadrunner-server/api/v4/plugins/v1/kv"
-	"github.com/roadrunner-server/api/v4/plugins/v2/jobs"
+	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
 	"github.com/roadrunner-server/boltdb/v4/boltjobs"
 	"github.com/roadrunner-server/boltdb/v4/boltkv"
 	"github.com/roadrunner-server/endure/v2/dep"

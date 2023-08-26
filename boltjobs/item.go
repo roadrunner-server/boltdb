@@ -5,11 +5,11 @@ import (
 	"encoding/gob"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/goccy/go-json"
-	"github.com/roadrunner-server/api/v4/plugins/v2/jobs"
+	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/sdk/v4/utils"
 	"go.etcd.io/bbolt"
 )
 
@@ -19,7 +19,7 @@ type Item struct {
 	// Ident is unique identifier of the job, should be provided from outside
 	Ident string `json:"id"`
 	// Payload is string data (usually JSON) passed to Job broker.
-	Payload string `json:"payload"`
+	Payload []byte `json:"payload"`
 	// Headers with key-values pairs
 	headers map[string][]string
 	// Options contains set of PipelineOptions specific to job execution. Can be empty.
@@ -63,7 +63,7 @@ func (i *Item) Headers() map[string][]string {
 }
 
 func (i *Item) Body() []byte {
-	return utils.AsBytes(i.Payload)
+	return i.Payload
 }
 
 func (i *Item) Context() ([]byte, error) {
@@ -115,8 +115,8 @@ func (i *Item) Ack() error {
 		return errors.E(op, err)
 	}
 
-	inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
-	err = inQb.Delete(utils.AsBytes(i.ID()))
+	inQb := tx.Bucket(strToBytes(InQueueBucket))
+	err = inQb.Delete(strToBytes(i.ID()))
 	if err != nil {
 		_ = tx.Rollback()
 		return errors.E(op, err)
@@ -148,18 +148,18 @@ func (i *Item) Nack() error {
 		return errors.E(op, err)
 	}
 
-	inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
-	v := inQb.Get(utils.AsBytes(i.ID()))
+	inQb := tx.Bucket(strToBytes(InQueueBucket))
+	v := inQb.Get(strToBytes(i.ID()))
 
-	pushB := tx.Bucket(utils.AsBytes(PushBucket))
+	pushB := tx.Bucket(strToBytes(PushBucket))
 
-	err = pushB.Put(utils.AsBytes(i.ID()), v)
+	err = pushB.Put(strToBytes(i.ID()), v)
 	if err != nil {
 		_ = tx.Rollback()
 		return errors.E(op, err)
 	}
 
-	err = inQb.Delete(utils.AsBytes(i.ID()))
+	err = inQb.Delete(strToBytes(i.ID()))
 	if err != nil {
 		_ = tx.Rollback()
 		return errors.E(op, err)
@@ -189,8 +189,8 @@ func (i *Item) Requeue(headers map[string][]string, delay int64) error {
 		return errors.E(op, err)
 	}
 
-	inQb := tx.Bucket(utils.AsBytes(InQueueBucket))
-	err = inQb.Delete(utils.AsBytes(i.ID()))
+	inQb := tx.Bucket(strToBytes(InQueueBucket))
+	err = inQb.Delete(strToBytes(i.ID()))
 	if err != nil {
 		return errors.E(op, i.rollback(err, tx))
 	}
@@ -204,14 +204,14 @@ func (i *Item) Requeue(headers map[string][]string, delay int64) error {
 	buf.Reset()
 
 	if delay > 0 {
-		delayB := tx.Bucket(utils.AsBytes(DelayBucket))
+		delayB := tx.Bucket(strToBytes(DelayBucket))
 		tKey := time.Now().UTC().Add(time.Second * time.Duration(delay)).Format(time.RFC3339)
 
 		if err != nil {
 			return errors.E(op, i.rollback(err, tx))
 		}
 
-		err = delayB.Put(utils.AsBytes(tKey), val)
+		err = delayB.Put(strToBytes(tKey), val)
 		if err != nil {
 			return errors.E(op, i.rollback(err, tx))
 		}
@@ -219,12 +219,12 @@ func (i *Item) Requeue(headers map[string][]string, delay int64) error {
 		return tx.Commit()
 	}
 
-	pushB := tx.Bucket(utils.AsBytes(PushBucket))
+	pushB := tx.Bucket(strToBytes(PushBucket))
 	if err != nil {
 		return errors.E(op, i.rollback(err, tx))
 	}
 
-	err = pushB.Put(utils.AsBytes(i.ID()), val)
+	err = pushB.Put(strToBytes(i.ID()), val)
 	if err != nil {
 		return errors.E(op, i.rollback(err, tx))
 	}
@@ -263,4 +263,12 @@ func fromJob(job jobs.Message) *Item {
 			Delay:    job.Delay(),
 		},
 	}
+}
+
+func strToBytes(data string) []byte {
+	if data == "" {
+		return nil
+	}
+
+	return unsafe.Slice(unsafe.StringData(data), len(data))
 }

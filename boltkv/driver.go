@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/roadrunner-server/api/v4/plugins/v1/kv"
 	"github.com/roadrunner-server/errors"
-	"github.com/roadrunner-server/sdk/v4/utils"
 	bolt "go.etcd.io/bbolt"
 	"go.uber.org/zap"
 )
@@ -166,7 +166,7 @@ func (d *Driver) Get(key string) ([]byte, error) {
 			}
 
 			// set the value
-			val = utils.AsBytes(i)
+			val = strToBytes(i)
 		}
 		return nil
 	})
@@ -445,7 +445,7 @@ func (d *Driver) startGCLoop() { //nolint:gocognit
 							if b == nil {
 								return errors.E(op, errors.NoSuchBucket)
 							}
-							err := b.Delete(utils.AsBytes(k))
+							err := b.Delete(strToBytes(k))
 							if err != nil {
 								return errors.E(op, err)
 							}
@@ -469,4 +469,12 @@ func (d *Driver) startGCLoop() { //nolint:gocognit
 			}
 		}
 	}()
+}
+
+func strToBytes(data string) []byte {
+	if data == "" {
+		return nil
+	}
+
+	return unsafe.Slice(unsafe.StringData(data), len(data))
 }
