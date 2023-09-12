@@ -40,6 +40,7 @@ type Plugin struct {
 func (p *Plugin) Init(log Logger, cfg Configurer) error {
 	p.log = log.NamedLogger(PluginName)
 	p.cfg = cfg
+	p.tracer = sdktrace.NewTracerProvider()
 	return nil
 }
 
@@ -60,7 +61,7 @@ func (p *Plugin) Collects() []*dep.In {
 
 func (p *Plugin) KvFromConfig(key string) (kv.Storage, error) {
 	const op = errors.Op("boltdb_plugin_provide")
-	st, err := boltkv.NewBoltDBDriver(p.log, key, p.cfg)
+	st, err := boltkv.NewBoltDBDriver(p.log, key, p.cfg, p.tracer)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
