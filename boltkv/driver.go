@@ -2,6 +2,7 @@ package boltkv
 
 import (
 	"bytes"
+	"context"
 	"encoding/gob"
 	"os"
 	"strings"
@@ -12,10 +13,14 @@ import (
 	"github.com/roadrunner-server/api/v4/plugins/v1/kv"
 	"github.com/roadrunner-server/errors"
 	bolt "go.etcd.io/bbolt"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
 )
 
-const RootPluginName string = "kv"
+const (
+	tracerName     string = "boltdb"
+	RootPluginName string = "kv"
+)
 
 type Configurer interface {
 	// UnmarshalKey takes a single key and unmarshal it into a Struct.
@@ -32,6 +37,7 @@ type Driver struct {
 	bucket []byte
 	log    *zap.Logger
 	cfg    *Config
+	tracer *sdktrace.TracerProvider
 
 	// gc contains keys with timeouts
 	gc sync.Map
@@ -42,7 +48,7 @@ type Driver struct {
 	stop chan struct{}
 }
 
-func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer) (*Driver, error) {
+func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer, tracer *sdktrace.TracerProvider) (*Driver, error) {
 	const op = errors.Op("new_boltdb_driver")
 
 	if !cfgPlugin.Has(RootPluginName) {
@@ -50,8 +56,9 @@ func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer) (*Driver
 	}
 
 	d := &Driver{
-		log:  log,
-		stop: make(chan struct{}, 1),
+		log:    log,
+		stop:   make(chan struct{}, 1),
+		tracer: tracer,
 	}
 
 	err := cfgPlugin.UnmarshalKey(key, &d.cfg)
@@ -98,8 +105,12 @@ func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer) (*Driver
 
 func (d *Driver) Has(keys ...string) (map[string]bool, error) {
 	const op = errors.Op("boltdb_driver_has")
+	_, span := d.tracer.Tracer(tracerName).Start(context.Background(), "boltdb:has")
+	defer span.End()
+
 	d.log.Debug("boltdb HAS method called", zap.Strings("args", keys))
 	if keys == nil {
+		span.RecordError(errors.E(op, errors.NoKeys))
 		return nil, errors.E(op, errors.NoKeys)
 	}
 
@@ -127,6 +138,7 @@ func (d *Driver) Has(keys ...string) (map[string]bool, error) {
 		return nil
 	})
 	if err != nil {
+		span.RecordError(err)
 		return nil, errors.E(op, err)
 	}
 
@@ -139,9 +151,12 @@ func (d *Driver) Has(keys ...string) (map[string]bool, error) {
 // The returned value is only valid for the life of the transaction.
 func (d *Driver) Get(key string) ([]byte, error) {
 	const op = errors.Op("boltdb_driver_get")
+	_, span := d.tracer.Tracer(tracerName).Start(context.Background(), "boltdb:get")
+	defer span.End()
 	// to get cases like "  "
 	keyTrimmed := strings.TrimSpace(key)
 	if keyTrimmed == "" {
+		span.RecordError(errors.E(op, errors.EmptyKey))
 		return nil, errors.E(op, errors.EmptyKey)
 	}
 
@@ -171,6 +186,7 @@ func (d *Driver) Get(key string) ([]byte, error) {
 		return nil
 	})
 	if err != nil {
+		span.RecordError(err)
 		return nil, errors.E(op, err)
 	}
 
@@ -179,8 +195,11 @@ func (d *Driver) Get(key string) ([]byte, error) {
 
 func (d *Driver) MGet(keys ...string) (map[string][]byte, error) {
 	const op = errors.Op("boltdb_driver_mget")
+	_, span := d.tracer.Tracer(tracerName).Start(context.Background(), "boltdb:mget")
+	defer span.End()
 	// defense
 	if keys == nil {
+		span.RecordError(errors.E(op, errors.NoKeys))
 		return nil, errors.E(op, errors.NoKeys)
 	}
 
@@ -188,6 +207,7 @@ func (d *Driver) MGet(keys ...string) (map[string][]byte, error) {
 	for i := range keys {
 		keyTrimmed := strings.TrimSpace(keys[i])
 		if keyTrimmed == "" {
+			span.RecordError(errors.E(op, errors.EmptyKey))
 			return nil, errors.E(op, errors.EmptyKey)
 		}
 	}
@@ -222,6 +242,7 @@ func (d *Driver) MGet(keys ...string) (map[string][]byte, error) {
 		return nil
 	})
 	if err != nil {
+		span.RecordError(err)
 		return nil, errors.E(op, err)
 	}
 
@@ -231,13 +252,17 @@ func (d *Driver) MGet(keys ...string) (map[string][]byte, error) {
 // Set puts the K/V to the bolt
 func (d *Driver) Set(items ...kv.Item) error {
 	const op = errors.Op("boltdb_driver_set")
+	_, span := d.tracer.Tracer(tracerName).Start(context.Background(), "boltdb:set")
+	defer span.End()
 	if items == nil {
+		span.RecordError(errors.E(op, errors.NoKeys))
 		return errors.E(op, errors.NoKeys)
 	}
 
 	// start writable transaction
 	tx, err := d.DB.Begin(true)
 	if err != nil {
+		span.RecordError(err)
 		return errors.E(op, err)
 	}
 	defer func() {
@@ -258,18 +283,17 @@ func (d *Driver) Set(items ...kv.Item) error {
 		// but gob will contain (w/o re-init) the past data
 		buf := new(bytes.Buffer)
 		encoder := gob.NewEncoder(buf)
-		if errors.Is(errors.EmptyItem, err) {
-			return errors.E(op, errors.EmptyItem)
-		}
 
 		// Encode value
 		err = encoder.Encode(items[i].Value())
 		if err != nil {
+			span.RecordError(err)
 			return errors.E(op, err)
 		}
 		// buf.Bytes will copy the underlying slice. Take a look in case of performance problems
 		err = b.Put([]byte(items[i].Key()), buf.Bytes())
 		if err != nil {
+			span.RecordError(err)
 			return errors.E(op, err)
 		}
 
@@ -279,6 +303,7 @@ func (d *Driver) Set(items ...kv.Item) error {
 			// check correctness of provided TTL
 			_, err := time.Parse(time.RFC3339, items[i].Timeout())
 			if err != nil {
+				span.RecordError(err)
 				return errors.E(op, err)
 			}
 			// Store key TTL in the separate map
@@ -294,7 +319,10 @@ func (d *Driver) Set(items ...kv.Item) error {
 // Delete all keys from DB
 func (d *Driver) Delete(keys ...string) error {
 	const op = errors.Op("boltdb_driver_delete")
+	_, span := d.tracer.Tracer(tracerName).Start(context.Background(), "boltdb:delete")
+	defer span.End()
 	if keys == nil {
+		span.RecordError(errors.E(op, errors.NoKeys))
 		return errors.E(op, errors.NoKeys)
 	}
 
@@ -302,6 +330,7 @@ func (d *Driver) Delete(keys ...string) error {
 	for _, key := range keys {
 		keyTrimmed := strings.TrimSpace(key)
 		if keyTrimmed == "" {
+			span.RecordError(errors.E(op, errors.EmptyKey))
 			return errors.E(op, errors.EmptyKey)
 		}
 	}
@@ -309,6 +338,7 @@ func (d *Driver) Delete(keys ...string) error {
 	// start writable transaction
 	tx, err := d.DB.Begin(true)
 	if err != nil {
+		span.RecordError(err)
 		return errors.E(op, err)
 	}
 
@@ -324,12 +354,14 @@ func (d *Driver) Delete(keys ...string) error {
 
 	b := tx.Bucket(d.bucket)
 	if b == nil {
+		span.RecordError(errors.E(op, errors.NoSuchBucket))
 		return errors.E(op, errors.NoSuchBucket)
 	}
 
 	for _, key := range keys {
 		err = b.Delete([]byte(key))
 		if err != nil {
+			span.RecordError(err)
 			return errors.E(op, err)
 		}
 	}
@@ -341,14 +373,19 @@ func (d *Driver) Delete(keys ...string) error {
 // If key already has the expiration time, it will be overwritten
 func (d *Driver) MExpire(items ...kv.Item) error {
 	const op = errors.Op("boltdb_driver_mexpire")
+	_, span := d.tracer.Tracer(tracerName).Start(context.Background(), "boltdb:mexpire")
+	defer span.End()
+
 	for i := range items {
 		if items[i].Timeout() == "" || strings.TrimSpace(items[i].Key()) == "" {
+			span.RecordError(errors.E(op, errors.Str("should set timeout and at least one key")))
 			return errors.E(op, errors.Str("should set timeout and at least one key"))
 		}
 
 		// verify provided TTL
 		_, err := time.Parse(time.RFC3339, items[i].Timeout())
 		if err != nil {
+			span.RecordError(err)
 			return errors.E(op, err)
 		}
 
@@ -359,7 +396,11 @@ func (d *Driver) MExpire(items ...kv.Item) error {
 
 func (d *Driver) TTL(keys ...string) (map[string]string, error) {
 	const op = errors.Op("boltdb_driver_ttl")
+	_, span := d.tracer.Tracer(tracerName).Start(context.Background(), "boltdb:ttl")
+	defer span.End()
+
 	if keys == nil {
+		span.RecordError(errors.E(op, errors.NoKeys))
 		return nil, errors.E(op, errors.NoKeys)
 	}
 
@@ -367,6 +408,7 @@ func (d *Driver) TTL(keys ...string) (map[string]string, error) {
 	for i := range keys {
 		keyTrimmed := strings.TrimSpace(keys[i])
 		if keyTrimmed == "" {
+			span.RecordError(errors.E(op, errors.EmptyKey))
 			return nil, errors.E(op, errors.EmptyKey)
 		}
 	}
@@ -383,6 +425,9 @@ func (d *Driver) TTL(keys ...string) (map[string]string, error) {
 }
 
 func (d *Driver) Clear() error {
+	_, span := d.tracer.Tracer(tracerName).Start(context.Background(), "boltdb:clear")
+	defer span.End()
+
 	err := d.DB.Update(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket(d.bucket)
 		if err != nil {
@@ -400,6 +445,7 @@ func (d *Driver) Clear() error {
 	})
 
 	if err != nil {
+		span.RecordError(err)
 		d.log.Error("clear transaction failed", zap.Error(err))
 		return err
 	}
