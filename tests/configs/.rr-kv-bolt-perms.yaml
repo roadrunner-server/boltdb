@@ -17,4 +17,4 @@ kv:
     driver: boltdb
     config:
       file: "africa.db"
-      permissions: 0777
+      permissions: 0755

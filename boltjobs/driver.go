@@ -142,10 +142,10 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *
 	otel.SetTextMapPropagator(prop)
 
 	var perm int64
-	perm, err = strconv.ParseInt(pipeline.String(permissions, "0777"), 8, 32)
+	perm, err = strconv.ParseInt(pipeline.String(permissions, "0755"), 8, 32)
 	if err != nil {
-		log.Warn("failed to parse permissions, fallback to default 0777", zap.String("provided", pipeline.String(permissions, "")))
-		perm = 511 // 0777
+		log.Warn("failed to parse permissions, fallback to default 0755", zap.String("provided", pipeline.String(permissions, "")))
+		perm = 493 // 0755
 	}
 
 	// add default values

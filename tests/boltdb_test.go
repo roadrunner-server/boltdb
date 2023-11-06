@@ -1150,7 +1150,7 @@ func declareBoltDBPipe(address string, file string) func(t *testing.T) {
 			"driver":      "boltdb",
 			"name":        "test-3",
 			"prefetch":    "100",
-			"permissions": "0777",
+			"permissions": "0755",
 			"priority":    "3",
 			"file":        file,
 		}}
