@@ -27,6 +27,6 @@ func (c *config) InitDefaults() {
 	}
 
 	if c.Permissions == 0 {
-		c.Permissions = 0777
+		c.Permissions = 0755
 	}
 }
