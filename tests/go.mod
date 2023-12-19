@@ -7,7 +7,7 @@ toolchain go1.21.5
 require (
 	github.com/goccy/go-json v0.10.2
 	github.com/google/uuid v1.5.0
-	github.com/roadrunner-server/api/v4 v4.9.0
+	github.com/roadrunner-server/api/v4 v4.10.0
 	github.com/roadrunner-server/boltdb/v4 v4.7.9
 	github.com/roadrunner-server/config/v4 v4.6.3
 	github.com/roadrunner-server/endure/v2 v2.4.3
