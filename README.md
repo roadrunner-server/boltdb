@@ -1,4 +1,4 @@
-# Docs (Jobs): [link](https://roadrunner.dev/docs/plugins-jobs/2.x/en)
+# Docs (Jobs): [link](https://docs.roadrunner.dev/queues-and-jobs/overview-queues)
 
 ---
-# Docs (kv): [link](https://roadrunner.dev/docs/plugins-kv/2.x/en)
+# Docs (KV): [link](https://docs.roadrunner.dev/key-value/overview-kv)
