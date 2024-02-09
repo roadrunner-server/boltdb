@@ -268,7 +268,7 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 
 	// increase number of listeners
 	atomic.AddUint32(&d.listeners, 1)
-	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int("elapsed", time.Since(start).Milliseconds()))
 	return nil
 }
 
@@ -284,7 +284,7 @@ func (d *Driver) Stop(ctx context.Context) error {
 	}
 
 	pipe := *d.pipeline.Load()
-	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int("elapsed", time.Since(start).Milliseconds()))
 	return d.db.Close()
 }
 
@@ -310,7 +310,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 
 	atomic.AddUint32(&d.listeners, ^uint32(0))
 
-	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int("elapsed", time.Since(start).Milliseconds()))
 
 	return nil
 }
@@ -339,7 +339,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 	// increase number of listeners
 	atomic.AddUint32(&d.listeners, 1)
 
-	d.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int("elapsed", time.Since(start).Milliseconds()))
 
 	return nil
 }
