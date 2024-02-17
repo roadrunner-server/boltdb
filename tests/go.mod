@@ -1,26 +1,24 @@
 module tests
 
-go 1.22
-
-toolchain go1.22.0
+go 1.22.0
 
 require (
 	github.com/goccy/go-json v0.10.2
 	github.com/google/uuid v1.6.0
-	github.com/roadrunner-server/api/v4 v4.10.0
-	github.com/roadrunner-server/boltdb/v4 v4.7.13
-	github.com/roadrunner-server/config/v4 v4.6.7
+	github.com/roadrunner-server/api/v4 v4.11.0
+	github.com/roadrunner-server/boltdb/v4 v4.7.14
+	github.com/roadrunner-server/config/v4 v4.6.8
 	github.com/roadrunner-server/endure/v2 v2.4.3
 	github.com/roadrunner-server/goridge/v3 v3.8.1
-	github.com/roadrunner-server/informer/v4 v4.3.14
-	github.com/roadrunner-server/jobs/v4 v4.7.13
-	github.com/roadrunner-server/kv/v4 v4.4.14
-	github.com/roadrunner-server/logger/v4 v4.2.14
-	github.com/roadrunner-server/memory/v4 v4.6.14
-	github.com/roadrunner-server/otel/v4 v4.3.12
-	github.com/roadrunner-server/resetter/v4 v4.0.21
-	github.com/roadrunner-server/rpc/v4 v4.2.15
-	github.com/roadrunner-server/server/v4 v4.5.7
+	github.com/roadrunner-server/informer/v4 v4.3.15
+	github.com/roadrunner-server/jobs/v4 v4.7.14
+	github.com/roadrunner-server/kv/v4 v4.4.15
+	github.com/roadrunner-server/logger/v4 v4.2.15
+	github.com/roadrunner-server/memory/v4 v4.6.15
+	github.com/roadrunner-server/otel/v4 v4.3.14
+	github.com/roadrunner-server/resetter/v4 v4.1.1
+	github.com/roadrunner-server/rpc/v4 v4.2.16
+	github.com/roadrunner-server/server/v4 v4.5.8
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/zap v1.26.0
 )
@@ -55,8 +53,8 @@ require (
 	github.com/pelletier/go-toml/v2 v2.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.18.0 // indirect
-	github.com/prometheus/client_model v0.5.0 // indirect
-	github.com/prometheus/common v0.46.0 // indirect
+	github.com/prometheus/client_model v0.6.0 // indirect
+	github.com/prometheus/common v0.47.0 // indirect
 	github.com/prometheus/procfs v0.12.0 // indirect
 	github.com/roadrunner-server/errors v1.4.0 // indirect
 	github.com/roadrunner-server/sdk/v4 v4.6.0 // indirect
@@ -94,16 +92,16 @@ require (
 	go.temporal.io/sdk v1.26.0-rc.2 // indirect
 	go.temporal.io/sdk/contrib/opentelemetry v0.4.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/exp v0.0.0-20240205201215-2c58cdc269a3 // indirect
-	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a // indirect
+	golang.org/x/net v0.21.0 // indirect
 	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	google.golang.org/genproto v0.0.0-20240205150955-31a09d347014 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20240205150955-31a09d347014 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240205150955-31a09d347014 // indirect
-	google.golang.org/grpc v1.61.0 // indirect
+	google.golang.org/genproto v0.0.0-20240213162025-012b6fc9bca9 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240213162025-012b6fc9bca9 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240213162025-012b6fc9bca9 // indirect
+	google.golang.org/grpc v1.61.1 // indirect
 	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
