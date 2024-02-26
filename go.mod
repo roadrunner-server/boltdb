@@ -8,7 +8,7 @@ require (
 	github.com/roadrunner-server/endure/v2 v2.4.3
 	github.com/roadrunner-server/errors v1.4.0
 	github.com/stretchr/testify v1.8.4
-	go.etcd.io/bbolt v1.3.8
+	go.etcd.io/bbolt v1.3.9
 	go.opentelemetry.io/contrib/propagators/jaeger v1.24.0
 	go.opentelemetry.io/otel v1.24.0
 	go.opentelemetry.io/otel/sdk v1.24.0
