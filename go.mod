@@ -1,11 +1,10 @@
 module github.com/roadrunner-server/boltdb/v4
 
 go 1.22.0
-
 require (
 	github.com/goccy/go-json v0.10.2
 	github.com/roadrunner-server/api/v4 v4.11.1
-	github.com/roadrunner-server/endure/v2 v2.4.3
+	github.com/roadrunner-server/endure/v2 v2.4.4
 	github.com/roadrunner-server/errors v1.4.0
 	github.com/stretchr/testify v1.9.0
 	go.etcd.io/bbolt v1.3.9
@@ -25,7 +24,6 @@ require (
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
 	golang.org/x/sys v0.18.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
