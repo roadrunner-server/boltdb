@@ -119,8 +119,8 @@ github.com/roadrunner-server/informer/v4 v4.4.0 h1:RmvgG0meaTONQYrEgOQKYk4LEuDJw
 github.com/roadrunner-server/informer/v4 v4.4.0/go.mod h1:cFX4Hys5eWykGQXNpbo/1x0WRLsBy1E34tX3v4uGYGM=
 github.com/roadrunner-server/jobs/v4 v4.8.0 h1:fb8XEzw9R0L/yh7OXMlHo4zOamCzP57P++wsN3eeiUo=
 github.com/roadrunner-server/jobs/v4 v4.8.0/go.mod h1:bOQunhEyLpKbsQ2ojQeJMxFMz4Lau+YfwiXQwskNtH8=
-github.com/roadrunner-server/kv/v4 v4.4.16 h1:66KMNbPuU85KrJCOHz6gBidrZxkdBoR7musPJbuSSQk=
-github.com/roadrunner-server/kv/v4 v4.4.16/go.mod h1:Y6g1bRZOsyPW9fyoy1cgv3AWG+63hb0C6SVnbEJWXm8=
+github.com/roadrunner-server/kv/v4 v4.5.0 h1:RRJaq7Z+7p2izo/CJYqoawgQmQ+OSNyFto9TGxWw9FM=
+github.com/roadrunner-server/kv/v4 v4.5.0/go.mod h1:1aSA8THyxneFTT2zUYcREFIRNLMEGkf08F0n1tL7L1I=
 github.com/roadrunner-server/logger/v4 v4.3.0 h1:y8pjSaaDQ32xI+pp2wdZz0wG0/Sn8w3HnvbGjZTlwPQ=
 github.com/roadrunner-server/logger/v4 v4.3.0/go.mod h1:nZaJuXuteCubZXBouXjQfvSqZQtAqZokNhbgANhZ+3A=
 github.com/roadrunner-server/memory/v4 v4.7.0 h1:SaRQiSmOn1Yag/I0J02V7kf5SKdfQEA/oavTIsdnsK4=
@@ -131,10 +131,10 @@ github.com/roadrunner-server/resetter/v4 v4.2.0 h1:FqH9yOxEsPwyLz2Pbydny0MqBxYuQ
 github.com/roadrunner-server/resetter/v4 v4.2.0/go.mod h1:6u2XolQjt9AL2qdr6tbr/IJbpQIvIgNTtxT+1Xdj7t0=
 github.com/roadrunner-server/rpc/v4 v4.3.0 h1:sWIC2Rqf+KIkSJAnv6VhJFhmt1jhiPdPYsZhL87NNiU=
 github.com/roadrunner-server/rpc/v4 v4.3.0/go.mod h1:L5cyi6+J6An1+7IjkH/9YTLifZ12JRaMa1e77uYQmvI=
-github.com/roadrunner-server/sdk/v4 v4.7.0 h1:u1pxTMWA2T7hBkcvT3cAmAQ48lYtVGDxKcHQUqhlG9I=
-github.com/roadrunner-server/sdk/v4 v4.7.0/go.mod h1:Hmdwhtotu6CcE0iDP1WKLXa/uimsNbHoA3oxEYHefV0=
-github.com/roadrunner-server/server/v4 v4.5.9 h1:m7JCbrjU97EeQjBTPhR3x5j3dGmkv52eoaJo0DuKUV8=
-github.com/roadrunner-server/server/v4 v4.5.9/go.mod h1:YmisW+/CQ59+ucX56KJ9E6e2rM27Z5gkv3apIWIVurA=
+github.com/roadrunner-server/sdk/v4 v4.7.1 h1:/QacFUa1Nsd1Z0MqNXslqGL1AxUfWLN17Zid/wKmC04=
+github.com/roadrunner-server/sdk/v4 v4.7.1/go.mod h1:Hmdwhtotu6CcE0iDP1WKLXa/uimsNbHoA3oxEYHefV0=
+github.com/roadrunner-server/server/v4 v4.7.0 h1:9JZQS25/hGlI1RRj4XyT28saj3BjQLqUPeLRTZexvy8=
+github.com/roadrunner-server/server/v4 v4.7.0/go.mod h1:MHjb/g/5BXotCxMXsJq9CUcJucFax1iJMGvTIlc24BA=
 github.com/roadrunner-server/tcplisten v1.4.0 h1:yWo09zktv/CSV6VywLfw4pwNcUchgTiIrW4uIICtO5M=
 github.com/roadrunner-server/tcplisten v1.4.0/go.mod h1:A6+VSnW2ETGnN/e/CMdP63ZXqQDaC0UDMU6QmyuB0yM=
 github.com/robfig/cron v1.2.0 h1:ZjScXvvxeQ63Dbyxy76Fj3AT3Ut0aKsyd2/tl3DTMuQ=
