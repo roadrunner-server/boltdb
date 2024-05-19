@@ -7,18 +7,18 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api/v4 v4.12.0
 	github.com/roadrunner-server/boltdb/v4 v4.7.15
-	github.com/roadrunner-server/config/v4 v4.8.1
+	github.com/roadrunner-server/config/v4 v4.8.2
 	github.com/roadrunner-server/endure/v2 v2.4.4
 	github.com/roadrunner-server/goridge/v3 v3.8.2
-	github.com/roadrunner-server/informer/v4 v4.5.1
-	github.com/roadrunner-server/jobs/v4 v4.9.1
-	github.com/roadrunner-server/kv/v4 v4.6.1
-	github.com/roadrunner-server/logger/v4 v4.4.1
-	github.com/roadrunner-server/memory/v4 v4.8.1
-	github.com/roadrunner-server/otel/v4 v4.5.1
-	github.com/roadrunner-server/resetter/v4 v4.3.1
-	github.com/roadrunner-server/rpc/v4 v4.4.1
-	github.com/roadrunner-server/server/v4 v4.8.1
+	github.com/roadrunner-server/informer/v4 v4.5.2
+	github.com/roadrunner-server/jobs/v4 v4.9.2
+	github.com/roadrunner-server/kv/v4 v4.6.2
+	github.com/roadrunner-server/logger/v4 v4.4.2
+	github.com/roadrunner-server/memory/v4 v4.8.2
+	github.com/roadrunner-server/otel/v4 v4.5.2
+	github.com/roadrunner-server/resetter/v4 v4.3.2
+	github.com/roadrunner-server/rpc/v4 v4.4.2
+	github.com/roadrunner-server/server/v4 v4.8.2
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/zap v1.27.0
 )
