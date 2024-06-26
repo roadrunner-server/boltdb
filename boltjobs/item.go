@@ -197,7 +197,7 @@ Requeue algorithm:
 */
 func (i *Item) Requeue(headers map[string][]string, delay int) error {
 	const op = errors.Op("boltdb_item_requeue")
-	if len(headers) > 0 {
+	if headers != nil && len(headers) > 0 {
 		maps.Copy(i.headers, headers)
 	}
 
