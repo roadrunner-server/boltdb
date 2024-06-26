@@ -197,6 +197,11 @@ Requeue algorithm:
 */
 func (i *Item) Requeue(headers map[string][]string, delay int) error {
 	const op = errors.Op("boltdb_item_requeue")
+
+	if i.headers == nil {
+		i.headers = make(map[string][]string)
+	}
+
 	if len(headers) > 0 {
 		maps.Copy(i.headers, headers)
 	}
@@ -274,7 +279,7 @@ func fromJob(job jobs.Message) *Item {
 		Job:     job.Name(),
 		Ident:   job.ID(),
 		Payload: job.Payload(),
-		headers: defaultHdr(job.Headers()),
+		headers: job.Headers(),
 		Options: &Options{
 			AutoAck:  job.AutoAck(),
 			Priority: job.Priority(),
@@ -282,14 +287,6 @@ func fromJob(job jobs.Message) *Item {
 			Delay:    int(job.Delay()),
 		},
 	}
-}
-
-func defaultHdr(headers map[string][]string) map[string][]string {
-	if len(headers) == 0 {
-		return make(map[string][]string)
-	}
-
-	return headers
 }
 
 func strToBytes(data string) []byte {
