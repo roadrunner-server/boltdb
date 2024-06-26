@@ -3,15 +3,18 @@ package boltjobs
 import (
 	"bytes"
 	"encoding/gob"
+	"maps"
 	"sync/atomic"
 	"time"
 	"unsafe"
 
 	"github.com/goccy/go-json"
-	"github.com/roadrunner-server/api/v4/plugins/v3/jobs"
+	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
 	"github.com/roadrunner-server/errors"
 	"go.etcd.io/bbolt"
 )
+
+var _ jobs.Job = (*Item)(nil)
 
 type Item struct {
 	// Job contains pluginName of job broker (usually PHP class).
@@ -34,7 +37,7 @@ type Options struct {
 	// Pipeline manually specified pipeline.
 	Pipeline string `json:"pipeline,omitempty"`
 	// Delay defines time duration to delay execution for. Defaults to none.
-	Delay int64 `json:"delay,omitempty"`
+	Delay int `json:"delay,omitempty"`
 	// AutoAck option
 	AutoAck bool `json:"auto_ack"`
 	// Push bucket
@@ -125,13 +128,26 @@ func (i *Item) Ack() error {
 	return tx.Commit()
 }
 
+func (i *Item) NackWithOptions(requeue bool, delay int) error {
+	// don't NACK the job when it was already ack'ed
+	if i.Options.AutoAck {
+		return nil
+	}
+
+	if requeue {
+		return i.Requeue(nil, delay)
+	}
+
+	return i.Nack()
+}
+
 func (i *Item) Nack() error {
 	// don't NACK the job when it was already ack'ed
 	if i.Options.AutoAck {
 		return nil
 	}
 
-	const op = errors.Op("boltdb_item_ack")
+	const op = errors.Op("boltdb_item_nack")
 	/*
 		steps:
 		1. begin tx
@@ -179,9 +195,17 @@ Requeue algorithm:
     4.3. Put this key with value to the DelayBucket
  5. W/o delay, put the key with value to the PushBucket (requeue)
 */
-func (i *Item) Requeue(headers map[string][]string, delay int64) error {
+func (i *Item) Requeue(headers map[string][]string, delay int) error {
 	const op = errors.Op("boltdb_item_requeue")
-	i.headers = headers
+
+	if i.headers == nil {
+		i.headers = make(map[string][]string)
+	}
+
+	if len(headers) > 0 {
+		maps.Copy(i.headers, headers)
+	}
+
 	i.Options.Delay = delay
 
 	tx, err := i.Options.db.Begin(true)
@@ -260,7 +284,7 @@ func fromJob(job jobs.Message) *Item {
 			AutoAck:  job.AutoAck(),
 			Priority: job.Priority(),
 			Pipeline: job.GroupID(),
-			Delay:    job.Delay(),
+			Delay:    int(job.Delay()),
 		},
 	}
 }
