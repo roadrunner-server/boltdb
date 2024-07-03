@@ -89,7 +89,7 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logg
 		return nil, errors.E(op, err)
 	}
 
-	// create bucket if it does not exist
+	// create a bucket if it does not exist
 	// tx.Commit invokes via the db.Update
 	err = create(db)
 	if err != nil {
@@ -159,7 +159,7 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *
 		return nil, errors.E(op, err)
 	}
 
-	// create bucket if it does not exist
+	// create a bucket if it does not exist
 	// tx.Commit invokes via the db.Update
 	err = create(db)
 	if err != nil {
@@ -284,6 +284,10 @@ func (d *Driver) Stop(ctx context.Context) error {
 	}
 
 	pipe := *d.pipeline.Load()
+
+	// remove all pending JOBS associated with the pipeline
+	_ = d.pq.Remove(pipe.Name())
+
 	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int64("elapsed", time.Since(start).Milliseconds()))
 	return d.db.Close()
 }
