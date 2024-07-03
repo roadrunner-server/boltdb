@@ -17,22 +17,22 @@ import (
 var _ jobs.Job = (*Item)(nil)
 
 type Item struct {
-	// Job contains pluginName of job broker (usually PHP class).
+	// Job contains the pluginName of job broker (usually PHP class).
 	Job string `json:"job"`
-	// Ident is unique identifier of the job, should be provided from outside
+	// Ident is a unique identifier of the job, should be provided from outside
 	Ident string `json:"id"`
 	// Payload is string data (usually JSON) passed to Job broker.
 	Payload []byte `json:"payload"`
 	// Headers with key-values pairs
 	headers map[string][]string
-	// Options contains set of PipelineOptions specific to job execution. Can be empty.
+	// Options contain a set of PipelineOptions specific to job execution. Can be empty.
 	Options *Options `json:"options,omitempty"`
 }
 
-// Options carry information about how to handle given job.
+// Options carry information about how to handle a given job.
 type Options struct {
 	// Priority is job priority, default - 10
-	// pointer to distinguish 0 as a priority and nil as priority not set
+	// pointer to distinguish 0 as a priority and nil as a priority not set
 	Priority int64 `json:"priority"`
 	// Pipeline manually specified pipeline.
 	Pipeline string `json:"pipeline,omitempty"`
@@ -187,7 +187,7 @@ func (i *Item) Nack() error {
 /*
 Requeue algorithm:
  1. Rewrite item headers and delay.
- 2. Begin writable transaction on attached to the item db.
+ 2. Begin a writable transaction attached to the item db.
  3. Delete item from the InQueueBucket
  4. Handle items with the delay:
     4.1. Get DelayBucket
