@@ -6,7 +6,7 @@ require (
 	github.com/goccy/go-json v0.10.3
 	github.com/google/uuid v1.6.0
 	github.com/roadrunner-server/api/v4 v4.15.0
-	github.com/roadrunner-server/boltdb/v4 v4.7.15
+	github.com/roadrunner-server/boltdb/v5 v5.0.0
 	github.com/roadrunner-server/config/v4 v4.9.3
 	github.com/roadrunner-server/endure/v2 v2.4.5
 	github.com/roadrunner-server/goridge/v3 v3.8.2
@@ -23,7 +23,7 @@ require (
 	go.uber.org/zap v1.27.0
 )
 
-replace github.com/roadrunner-server/boltdb/v4 => ../
+replace github.com/roadrunner-server/boltdb/v5 => ../
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -77,7 +77,7 @@ require (
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.etcd.io/bbolt v1.3.10 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.52.0 // indirect
-	go.opentelemetry.io/contrib/propagators/jaeger v1.27.0 // indirect
+	go.opentelemetry.io/contrib/propagators/jaeger v1.28.0 // indirect
 	go.opentelemetry.io/otel v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.28.0 // indirect
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.28.0 // indirect

@@ -3,8 +3,8 @@ package boltdb
 import (
 	"github.com/roadrunner-server/api/v4/plugins/v1/kv"
 	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
-	"github.com/roadrunner-server/boltdb/v4/boltjobs"
-	"github.com/roadrunner-server/boltdb/v4/boltkv"
+	"github.com/roadrunner-server/boltdb/v5/boltjobs"
+	"github.com/roadrunner-server/boltdb/v5/boltkv"
 	"github.com/roadrunner-server/endure/v2/dep"
 	"github.com/roadrunner-server/errors"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
