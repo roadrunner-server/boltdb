@@ -21,7 +21,7 @@ import (
 	jobsProto "github.com/roadrunner-server/api/v4/build/jobs/v1"
 	kvProto "github.com/roadrunner-server/api/v4/build/kv/v1"
 	jobState "github.com/roadrunner-server/api/v4/plugins/v1/jobs"
-	"github.com/roadrunner-server/boltdb/v4"
+	"github.com/roadrunner-server/boltdb/v5"
 	"github.com/roadrunner-server/config/v4"
 	"github.com/roadrunner-server/endure/v2"
 	goridgeRpc "github.com/roadrunner-server/goridge/v3/pkg/rpc"
