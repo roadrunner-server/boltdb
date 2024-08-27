@@ -73,7 +73,7 @@ func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer, tracer *
 	d.timeout = time.Duration(d.cfg.Interval) * time.Second
 	d.gc = sync.Map{}
 
-	db, err := bolt.Open(d.cfg.File, os.FileMode(d.cfg.Permissions), &bolt.Options{
+	db, err := bolt.Open(d.cfg.File, os.FileMode(d.cfg.Permissions), &bolt.Options{ //nolint:gosec
 		Timeout: time.Second * 20,
 	})
 

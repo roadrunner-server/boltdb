@@ -81,7 +81,7 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logg
 	otel.SetTextMapPropagator(prop)
 
 	localCfg.InitDefaults()
-	db, err := bolt.Open(localCfg.File, os.FileMode(localCfg.Permissions), &bolt.Options{
+	db, err := bolt.Open(localCfg.File, os.FileMode(localCfg.Permissions), &bolt.Options{ //nolint:gosec
 		Timeout: time.Second * 20,
 	})
 
@@ -151,7 +151,7 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *
 	// add default values
 	conf.InitDefaults()
 
-	db, err := bolt.Open(pipeline.String(file, rrDB), os.FileMode(perm), &bolt.Options{
+	db, err := bolt.Open(pipeline.String(file, rrDB), os.FileMode(perm), &bolt.Options{ //nolint:gosec
 		Timeout: time.Second * 20,
 	})
 
@@ -359,8 +359,8 @@ func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 		Driver:   pipe.Driver(),
 		Queue:    PushBucket,
 		Priority: uint64(pipe.Priority()),
-		Active:   int64(atomic.LoadUint64(d.active)),
-		Delayed:  int64(atomic.LoadUint64(d.delayed)),
+		Active:   int64(atomic.LoadUint64(d.active)),  //nolint:gosec
+		Delayed:  int64(atomic.LoadUint64(d.delayed)), //nolint:gosec
 		Ready:    toBool(atomic.LoadUint32(&d.listeners)),
 	}, nil
 }
