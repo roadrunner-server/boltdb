@@ -7,7 +7,7 @@ toolchain go1.23.0
 require (
 	github.com/goccy/go-json v0.10.3
 	github.com/roadrunner-server/api/v4 v4.16.0
-	github.com/roadrunner-server/endure/v2 v2.5.0
+	github.com/roadrunner-server/endure/v2 v2.6.1
 	github.com/roadrunner-server/errors v1.4.1
 	github.com/stretchr/testify v1.9.0
 	go.etcd.io/bbolt v1.3.11
@@ -29,7 +29,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.29.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
