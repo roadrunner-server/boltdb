@@ -358,7 +358,7 @@ func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 		Pipeline: pipe.Name(),
 		Driver:   pipe.Driver(),
 		Queue:    PushBucket,
-		Priority: uint64(pipe.Priority()),
+		Priority: uint64(pipe.Priority()),             //nolint:gosec
 		Active:   int64(atomic.LoadUint64(d.active)),  //nolint:gosec
 		Delayed:  int64(atomic.LoadUint64(d.delayed)), //nolint:gosec
 		Ready:    toBool(atomic.LoadUint32(&d.listeners)),

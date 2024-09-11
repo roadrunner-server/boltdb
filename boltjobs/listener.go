@@ -24,7 +24,7 @@ func (d *Driver) listener() {
 			_ = d.pq.Remove((*d.pipeline.Load()).Name())
 			return
 		case <-tt.C:
-			if atomic.LoadUint64(d.active) > uint64(d.prefetch) {
+			if atomic.LoadUint64(d.active) > uint64(d.prefetch) { //nolint:gosec
 				time.Sleep(time.Second)
 				continue
 			}
