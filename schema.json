@@ -1,0 +1,73 @@
+{
+  "$id": "https://raw.githubusercontent.com/roadrunner-server/boltdb/refs/heads/master/schema.json",
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "roadrunner-boltdb",
+  "description": "The schema contains all the valid configuration parameters for the BoltDB plugin for the roadrunner job system.",
+  "definitions": {
+    "permissions": {
+      "description": "Permissions for the BoltDB database file, if created by RR.",
+      "type": "integer",
+      "default": 755,
+      "minimum": 0,
+      "maximum": 777
+    },
+    "file": {
+      "description": "BoltDB database file to create or use.",
+      "type": "string",
+      "default": "rr.db"
+    },
+    "pipeline": {
+      "type": "object",
+      "required": [
+        "driver"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "driver": {
+          "type": "string",
+          "enum": [
+            "boltdb"
+          ]
+        },
+        "config": {
+          "type": "object",
+          "description": "Configuration for the BoltDB pipeline.",
+          "additionalProperties": false,
+          "properties": {
+            "priority": {
+              "$ref": "https://raw.githubusercontent.com/roadrunner-server/jobs/refs/heads/master/schema.json#/definitions/PipelineProperties/priority"
+            },
+            "prefetch": {
+              "$ref": "https://raw.githubusercontent.com/roadrunner-server/jobs/refs/heads/master/schema.json#/definitions/PipelineProperties/prefetch"
+            },
+            "permissions": {
+              "$ref": "#/definitions/permissions"
+            },
+            "file": {
+              "$ref": "#/definitions/file"
+            }
+          }
+        }
+      }
+    },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration options for the BoltDB driver.",
+      "properties": {
+        "file": {
+          "$ref": "#/definitions/file"
+        },
+        "permissions": {
+          "$ref": "#/definitions/permissions"
+        },
+        "interval": {
+          "description": "TTL keys check interval in seconds. It's safe to use 1 second here, but can be a little costly to performance. If you set this to zero, 60 will be used.",
+          "type": "integer",
+          "minimum": 1,
+          "default": 60
+        }
+      }
+    }
+  }
+}
