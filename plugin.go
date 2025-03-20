@@ -1,6 +1,8 @@
 package boltdb
 
 import (
+	_ "google.golang.org/genproto/protobuf/ptype" //nolint:revive,nolintlint
+
 	"github.com/roadrunner-server/api/v4/plugins/v1/kv"
 	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
 	"github.com/roadrunner-server/boltdb/v5/boltjobs"
