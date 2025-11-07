@@ -6,7 +6,7 @@ toolchain go1.25.3
 
 require (
 	github.com/goccy/go-json v0.10.5
-	github.com/roadrunner-server/api/v4 v4.22.1
+	github.com/roadrunner-server/api/v4 v4.23.0
 	github.com/roadrunner-server/endure/v2 v2.6.2
 	github.com/roadrunner-server/errors v1.4.1
 	github.com/stretchr/testify v1.11.1
