@@ -1,14 +1,12 @@
 package boltdb
 
 import (
-	"io"
 	"log/slog"
 	"net"
-	"net/http"
 	"net/rpc"
 	"os"
 	"os/signal"
-	"sort"
+	"slices"
 	"sync"
 	"syscall"
 	"testing"
@@ -19,20 +17,18 @@ import (
 	"tests/helpers"
 	mocklogger "tests/mock"
 
-	"github.com/goccy/go-json"
+	jobState "github.com/roadrunner-server/api-plugins/v6/jobs"
 	jobsProto "github.com/roadrunner-server/api/v4/build/jobs/v1"
 	kvProto "github.com/roadrunner-server/api/v4/build/kv/v1"
-	jobState "github.com/roadrunner-server/api/v4/plugins/v1/jobs"
-	"github.com/roadrunner-server/boltdb/v5"
+	"github.com/roadrunner-server/boltdb/v6"
 	"github.com/roadrunner-server/config/v5"
 	"github.com/roadrunner-server/endure/v2"
-	goridgeRpc "github.com/roadrunner-server/goridge/v3/pkg/rpc"
+	goridgeRpc "github.com/roadrunner-server/goridge/v4/pkg/rpc"
 	"github.com/roadrunner-server/informer/v5"
-	"github.com/roadrunner-server/jobs/v5"
-	"github.com/roadrunner-server/kv/v5"
+	"github.com/roadrunner-server/jobs/v6"
+	"github.com/roadrunner-server/kv/v6"
 	"github.com/roadrunner-server/logger/v5"
 	"github.com/roadrunner-server/memory/v5"
-	"github.com/roadrunner-server/otel/v5"
 	"github.com/roadrunner-server/resetter/v5"
 	rpcPlugin "github.com/roadrunner-server/rpc/v5"
 	"github.com/roadrunner-server/server/v5"
@@ -189,7 +185,7 @@ func TestBoltDBPQ(t *testing.T) {
 	}()
 
 	time.Sleep(time.Second * 3)
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		t.Run("PushPipeline", helpers.PushToPipe("test-1-pq", false, "127.0.0.1:6001"))
 		t.Run("PushPipeline", helpers.PushToPipe("test-2-pq", false, "127.0.0.1:6001"))
 	}
@@ -618,11 +614,12 @@ func TestBoltDBOTEL(t *testing.T) {
 		Prefix:  "rr",
 	}
 
+	tracer := mocklogger.NewInMemoryTracer(t)
 	l, oLogger := mocklogger.ZapTestLogger(zap.DebugLevel)
 	err := cont.RegisterAll(
 		cfg,
 		&server.Plugin{},
-		&otel.Plugin{},
+		tracer,
 		&rpcPlugin.Plugin{},
 		l,
 		&jobs.Plugin{},
@@ -685,19 +682,17 @@ func TestBoltDBOTEL(t *testing.T) {
 	stopCh <- struct{}{}
 	wg.Wait()
 
-	resp, err := http.Get("http://127.0.0.1:9411/api/v2/spans?serviceName=rr_test_boltdb")
-	assert.NoError(t, err)
+	spans := tracer.Exp.GetSpans()
+	spanNameSet := make(map[string]struct{}, len(spans))
+	for _, s := range spans {
+		spanNameSet[s.Name] = struct{}{}
+	}
 
-	buf, err := io.ReadAll(resp.Body)
-	assert.NoError(t, err)
-
-	var spans []string
-	err = json.Unmarshal(buf, &spans)
-	assert.NoError(t, err)
-
-	sort.Slice(spans, func(i, j int) bool {
-		return spans[i] < spans[j]
-	})
+	uniqueNames := make([]string, 0, len(spanNameSet))
+	for name := range spanNameSet {
+		uniqueNames = append(uniqueNames, name)
+	}
+	slices.Sort(uniqueNames)
 
 	expected := []string{
 		"boltdb_listener",
@@ -707,7 +702,7 @@ func TestBoltDBOTEL(t *testing.T) {
 		"jobs_listener",
 		"push",
 	}
-	assert.Equal(t, expected, spans)
+	assert.Equal(t, expected, uniqueNames)
 
 	assert.Equal(t, 1, oLogger.FilterMessageSnippet("job was pushed successfully").Len())
 	assert.Equal(t, 1, oLogger.FilterMessageSnippet("job processing was started").Len())
@@ -716,7 +711,6 @@ func TestBoltDBOTEL(t *testing.T) {
 
 	t.Cleanup(func() {
 		assert.NoError(t, os.Remove("rr-otel.db"))
-		_ = resp.Body.Close()
 	})
 }
 
@@ -791,7 +785,7 @@ func TestBoltDb(t *testing.T) {
 }
 
 func testRPCMethods(t *testing.T) {
-	conn, err := net.Dial("tcp", "127.0.0.1:6001")
+	conn, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", "127.0.0.1:6001")
 	assert.NoError(t, err)
 	client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
 
@@ -985,7 +979,7 @@ func testRPCMethods(t *testing.T) {
 
 func declareBoltDBPipe(address string, file string) func(t *testing.T) {
 	return func(t *testing.T) {
-		conn, err := net.Dial("tcp", address)
+		conn, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", address)
 		assert.NoError(t, err)
 		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
 

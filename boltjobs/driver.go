@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
+	"github.com/roadrunner-server/api-plugins/v6/jobs"
 	"github.com/roadrunner-server/errors"
 	bolt "go.etcd.io/bbolt"
 	jprop "go.opentelemetry.io/contrib/propagators/jaeger"
@@ -64,7 +64,7 @@ type Driver struct {
 	stopCh chan struct{}
 }
 
-func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq jobs.Queue) (*Driver, error) {
+func FromConfig(_ context.Context, tracer *sdktrace.TracerProvider, configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	var localCfg config
@@ -84,13 +84,10 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logg
 	db, err := bolt.Open(localCfg.File, os.FileMode(localCfg.Permissions), &bolt.Options{ //nolint:gosec
 		Timeout: time.Second * 20,
 	})
-
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
-	// create a bucket if it does not exist
-	// tx.Commit invokes via the db.Update
 	err = create(db)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -111,8 +108,8 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logg
 		},
 		cond: sync.NewCond(&sync.Mutex{}),
 
-		delayed: toPtr(uint64(0)),
-		active:  toPtr(uint64(0)),
+		delayed: new(uint64),
+		active:  new(uint64),
 
 		db:     db,
 		log:    log,
@@ -125,11 +122,11 @@ func FromConfig(tracer *sdktrace.TracerProvider, configKey string, log *zap.Logg
 	return dr, nil
 }
 
-func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
+func FromPipeline(_ context.Context, tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	var conf config
-	err := cfg.UnmarshalKey(pluginName, conf)
+	err := cfg.UnmarshalKey(pluginName, &conf)
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
@@ -148,19 +145,15 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *
 		perm = 493 // 0755
 	}
 
-	// add default values
 	conf.InitDefaults()
 
 	db, err := bolt.Open(pipeline.String(file, rrDB), os.FileMode(perm), &bolt.Options{ //nolint:gosec
 		Timeout: time.Second * 20,
 	})
-
 	if err != nil {
 		return nil, errors.E(op, err)
 	}
 
-	// create a bucket if it does not exist
-	// tx.Commit invokes via the db.Update
 	err = create(db)
 	if err != nil {
 		return nil, errors.E(op, err)
@@ -179,8 +172,8 @@ func FromPipeline(tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *
 		}},
 		cond: sync.NewCond(&sync.Mutex{}),
 
-		delayed: toPtr(uint64(0)),
-		active:  toPtr(uint64(0)),
+		delayed: new(uint64),
+		active:  new(uint64),
 
 		db:     db,
 		log:    log,
@@ -202,9 +195,7 @@ func (d *Driver) Push(ctx context.Context, job jobs.Message) error {
 	err := d.db.Update(func(tx *bolt.Tx) error {
 		item := fromJob(job)
 		d.prop.Inject(ctx, propagation.HeaderCarrier(item.headers))
-		// pool with buffers
 		buf := d.get()
-		// encode the job
 		enc := gob.NewEncoder(buf)
 		err := enc.Encode(item)
 		if err != nil {
@@ -216,7 +207,6 @@ func (d *Driver) Push(ctx context.Context, job jobs.Message) error {
 		copy(value, buf.Bytes())
 		d.put(buf)
 
-		// handle delay
 		if item.Options.Delay > 0 {
 			b := tx.Bucket(strToBytes(DelayBucket))
 			tKey := time.Now().UTC().Add(time.Second * time.Duration(item.Options.Delay)).Format(time.RFC3339)
@@ -237,7 +227,6 @@ func (d *Driver) Push(ctx context.Context, job jobs.Message) error {
 			return errors.E(op, err)
 		}
 
-		// increment active counter
 		atomic.AddUint64(d.active, 1)
 
 		return nil
@@ -262,13 +251,11 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 		return errors.E(op, errors.Errorf("no such pipeline registered: %s", pipe.Name()))
 	}
 
-	// run listener
-	go d.listener()
+	go d.listener() //nolint:gosec
 	go d.delayedJobsListener()
 
-	// increase number of listeners
 	atomic.AddUint32(&d.listeners, 1)
-	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int64("elapsed", time.Since(start).Milliseconds()))
+	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 	return nil
 }
 
@@ -285,10 +272,9 @@ func (d *Driver) Stop(ctx context.Context) error {
 
 	pipe := *d.pipeline.Load()
 
-	// remove all pending JOBS associated with the pipeline
 	_ = d.pq.Remove(pipe.Name())
 
-	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int64("elapsed", time.Since(start).Milliseconds()))
+	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 	return d.db.Close()
 }
 
@@ -304,7 +290,6 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 	}
 
 	l := atomic.LoadUint32(&d.listeners)
-	// no active listeners
 	if l == 0 {
 		return errors.Str("no active listeners, nothing to pause")
 	}
@@ -314,7 +299,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 
 	atomic.AddUint32(&d.listeners, ^uint32(0))
 
-	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int64("elapsed", time.Since(start).Milliseconds()))
+	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 
 	return nil
 }
@@ -331,19 +316,16 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 	}
 
 	l := atomic.LoadUint32(&d.listeners)
-	// no active listeners
 	if l == 1 {
 		return errors.Str("boltdb listener is already in the active state")
 	}
 
-	// run listener
-	go d.listener()
+	go d.listener() //nolint:gosec
 	go d.delayedJobsListener()
 
-	// increase number of listeners
 	atomic.AddUint32(&d.listeners, 1)
 
-	d.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Int64("elapsed", time.Since(start).Milliseconds()))
+	d.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
 
 	return nil
 }
@@ -361,7 +343,7 @@ func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 		Priority: uint64(pipe.Priority()),             //nolint:gosec
 		Active:   int64(atomic.LoadUint64(d.active)),  //nolint:gosec
 		Delayed:  int64(atomic.LoadUint64(d.delayed)), //nolint:gosec
-		Ready:    toBool(atomic.LoadUint32(&d.listeners)),
+		Ready:    atomic.LoadUint32(&d.listeners) > 0,
 	}, nil
 }
 
@@ -390,7 +372,6 @@ func create(db *bolt.DB) error {
 
 		pushB := tx.Bucket(strToBytes(PushBucket))
 
-		// get all items, which are in the InQueueBucket and put them into the PushBucket
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
 			err = pushB.Put(k, v)
 			if err != nil {
@@ -401,11 +382,7 @@ func create(db *bolt.DB) error {
 		return nil
 	})
 
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (d *Driver) get() *bytes.Buffer {
@@ -415,12 +392,4 @@ func (d *Driver) get() *bytes.Buffer {
 func (d *Driver) put(b *bytes.Buffer) {
 	b.Reset()
 	d.bPool.Put(b)
-}
-
-func toBool(r uint32) bool {
-	return r > 0
-}
-
-func toPtr[T any](v T) *T {
-	return &v
 }

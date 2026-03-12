@@ -20,7 +20,6 @@ func (d *Driver) listener() {
 		select {
 		case <-d.stopCh:
 			d.log.Debug("boltdb listener stopped")
-			// on stop - remove all associated item from the PQ
 			_ = d.pq.Remove((*d.pipeline.Load()).Name())
 			return
 		case <-tt.C:
@@ -37,7 +36,6 @@ func (d *Driver) listener() {
 			b := tx.Bucket(strToBytes(PushBucket))
 			inQb := tx.Bucket(strToBytes(InQueueBucket))
 
-			// get first item
 			k, v := b.Cursor().First()
 			if k == nil && v == nil {
 				_ = tx.Commit()
@@ -64,12 +62,10 @@ func (d *Driver) listener() {
 				item.Options.Priority = d.priority
 			}
 
-			// used only for the debug purposes
 			if item.Options.AutoAck {
 				d.log.Debug("auto ack is turned on, message acknowledged")
 			}
 
-			// If AutoAck is false, put the job into the safe DB
 			if !item.Options.AutoAck {
 				err = inQb.Put(strToBytes(item.ID()), v)
 				if err != nil {
@@ -83,7 +79,6 @@ func (d *Driver) listener() {
 				}
 			}
 
-			// delete key from the PushBucket
 			err = b.Delete(k)
 			if err != nil {
 				d.rollback(err, tx)
@@ -111,33 +106,23 @@ func (d *Driver) listener() {
 			}
 
 			d.prop.Inject(ctx, propagation.HeaderCarrier(item.headers))
-			// attach pointer to the DB
 			item.attachDB(d.db, d.active, d.delayed)
-			// as the last step, after commit, put the item into the PQ
 			d.pq.Insert(item)
 			span.End()
 		}
 	}
 }
 
-func (d *Driver) delayedJobsListener() { //nolint:gocognit
+func (d *Driver) delayedJobsListener() {
 	tt := time.NewTicker(time.Second)
 	defer tt.Stop()
 
-	// just some 90's
-	loc, err := time.LoadLocation("UTC")
-	if err != nil {
-		d.log.Error("failed to load location, delayed jobs won't work", zap.Error(err))
-		return
-	}
-
-	var startDate = strToBytes(time.Date(1990, 1, 1, 0, 0, 0, 0, loc).Format(time.RFC3339))
+	startDate := strToBytes(time.Date(1990, 1, 1, 0, 0, 0, 0, time.UTC).Format(time.RFC3339))
 
 	for {
 		select {
 		case <-d.stopCh:
 			d.log.Debug("boltdb listener stopped")
-			// on stop - remove all associated item from the PQ
 			_ = d.pq.Remove((*d.pipeline.Load()).Name())
 			return
 		case <-tt.C:
@@ -168,12 +153,10 @@ func (d *Driver) delayedJobsListener() { //nolint:gocognit
 					item.Options.Priority = d.priority
 				}
 
-				// used only for the debug purposes
 				if item.Options.AutoAck {
 					d.log.Debug("auto ack is turned on, message acknowledged")
 				}
 
-				// If AutoAck is false, put the job into the safe DB
 				if !item.Options.AutoAck {
 					err = inQb.Put(strToBytes(item.ID()), v)
 					if err != nil {
@@ -182,16 +165,13 @@ func (d *Driver) delayedJobsListener() { //nolint:gocognit
 					}
 				}
 
-				// delete key from the PushBucket
 				err = delayB.Delete(k)
 				if err != nil {
 					d.rollback(err, tx)
 					continue
 				}
 
-				// attach pointer to the DB
 				item.attachDB(d.db, d.active, d.delayed)
-				// as the last step, after commit, put the item into the PQ
 				d.pq.Insert(item)
 			}
 

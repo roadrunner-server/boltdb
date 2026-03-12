@@ -3,13 +3,13 @@ package boltjobs
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/json"
 	"maps"
 	"sync/atomic"
 	"time"
 	"unsafe"
 
-	"github.com/goccy/go-json"
-	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
+	"github.com/roadrunner-server/api-plugins/v6/jobs"
 	"github.com/roadrunner-server/errors"
 	"go.etcd.io/bbolt"
 )
@@ -32,7 +32,6 @@ type Item struct {
 // Options carry information about how to handle a given job.
 type Options struct {
 	// Priority is job priority, default - 10
-	// pointer to distinguish 0 as a priority and nil as a priority not set
 	Priority int64 `json:"priority"`
 	// Pipeline manually specified pipeline.
 	Pipeline string `json:"pipeline,omitempty"`
@@ -87,7 +86,6 @@ func (i *Item) Context() ([]byte, error) {
 			Pipeline: i.Options.Pipeline,
 		},
 	)
-
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +127,6 @@ func (i *Item) Ack() error {
 }
 
 func (i *Item) NackWithOptions(requeue bool, delay int) error {
-	// don't NACK the job when it was already ack'ed
 	if i.Options.AutoAck {
 		return nil
 	}
@@ -142,19 +139,12 @@ func (i *Item) NackWithOptions(requeue bool, delay int) error {
 }
 
 func (i *Item) Nack() error {
-	// don't NACK the job when it was already ack'ed
 	if i.Options.AutoAck {
 		return nil
 	}
 
 	const op = errors.Op("boltdb_item_nack")
-	/*
-		steps:
-		1. begin tx
-		2. get item by ID from the InQueueBucket (previously put in the listener)
-		3. put it back to the PushBucket
-		4. Delete it from the InQueueBucket
-	*/
+
 	tx, err := i.Options.db.Begin(true)
 	if err != nil {
 		if tx == nil {
@@ -184,17 +174,6 @@ func (i *Item) Nack() error {
 	return tx.Commit()
 }
 
-/*
-Requeue algorithm:
- 1. Rewrite item headers and delay.
- 2. Begin a writable transaction attached to the item db.
- 3. Delete item from the InQueueBucket
- 4. Handle items with the delay:
-    4.1. Get DelayBucket
-    4.2. Make a key by adding the delay to the time.Now() in RFC3339 format
-    4.3. Put this key with value to the DelayBucket
- 5. W/o delay, put the key with value to the PushBucket (requeue)
-*/
 func (i *Item) Requeue(headers map[string][]string, delay int) error {
 	const op = errors.Op("boltdb_item_requeue")
 
@@ -219,10 +198,13 @@ func (i *Item) Requeue(headers map[string][]string, delay int) error {
 		return errors.E(op, i.rollback(err, tx))
 	}
 
-	// encode the item
 	buf := new(bytes.Buffer)
 	enc := gob.NewEncoder(buf)
 	err = enc.Encode(i)
+	if err != nil {
+		return errors.E(op, i.rollback(err, tx))
+	}
+
 	val := make([]byte, buf.Len())
 	copy(val, buf.Bytes())
 	buf.Reset()
@@ -230,10 +212,6 @@ func (i *Item) Requeue(headers map[string][]string, delay int) error {
 	if delay > 0 {
 		delayB := tx.Bucket(strToBytes(DelayBucket))
 		tKey := time.Now().UTC().Add(time.Second * time.Duration(delay)).Format(time.RFC3339)
-
-		if err != nil {
-			return errors.E(op, i.rollback(err, tx))
-		}
 
 		err = delayB.Put(strToBytes(tKey), val)
 		if err != nil {
@@ -244,10 +222,6 @@ func (i *Item) Requeue(headers map[string][]string, delay int) error {
 	}
 
 	pushB := tx.Bucket(strToBytes(PushBucket))
-	if err != nil {
-		return errors.E(op, i.rollback(err, tx))
-	}
-
 	err = pushB.Put(strToBytes(i.ID()), val)
 	if err != nil {
 		return errors.E(op, i.rollback(err, tx))
