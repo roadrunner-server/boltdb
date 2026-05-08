@@ -1,21 +1,23 @@
 package boltdb
 
 import (
+	"context"
+
 	_ "google.golang.org/genproto/protobuf/ptype" //nolint:revive,nolintlint
 
-	"github.com/roadrunner-server/api/v4/plugins/v1/kv"
-	"github.com/roadrunner-server/api/v4/plugins/v4/jobs"
-	"github.com/roadrunner-server/boltdb/v5/boltjobs"
-	"github.com/roadrunner-server/boltdb/v5/boltkv"
+	"github.com/roadrunner-server/api-plugins/v6/jobs"
+	"github.com/roadrunner-server/api-plugins/v6/kv"
+	"github.com/roadrunner-server/boltdb/v6/boltjobs"
+	"github.com/roadrunner-server/boltdb/v6/boltkv"
 	"github.com/roadrunner-server/endure/v2/dep"
 	"github.com/roadrunner-server/errors"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"
 )
 
-const (
-	PluginName string = "boltdb"
-)
+var _ jobs.Constructor = (*Plugin)(nil)
+
+const pluginName string = "boltdb"
 
 type Configurer interface {
 	// UnmarshalKey takes a single key and unmarshal it into a Struct.
@@ -32,23 +34,20 @@ type Tracer interface {
 	Tracer() *sdktrace.TracerProvider
 }
 
-// Plugin BoltDB K/V storage.
 type Plugin struct {
-	cfg    Configurer
 	log    *zap.Logger
+	cfg    Configurer
 	tracer *sdktrace.TracerProvider
 }
 
 func (p *Plugin) Init(log Logger, cfg Configurer) error {
-	p.log = log.NamedLogger(PluginName)
+	p.log = log.NamedLogger(pluginName)
 	p.cfg = cfg
-	p.tracer = sdktrace.NewTracerProvider()
 	return nil
 }
 
-// Name returns plugin name
 func (p *Plugin) Name() string {
-	return PluginName
+	return pluginName
 }
 
 func (p *Plugin) Collects() []*dep.In {
@@ -59,9 +58,7 @@ func (p *Plugin) Collects() []*dep.In {
 	}
 }
 
-// KV bolt implementation
-
-func (p *Plugin) KvFromConfig(key string) (kv.Storage, error) {
+func (p *Plugin) KvFromConfig(_ context.Context, key string) (kv.Storage, error) {
 	const op = errors.Op("boltdb_plugin_provide")
 	st, err := boltkv.NewBoltDBDriver(p.log, key, p.cfg, p.tracer)
 	if err != nil {
@@ -70,14 +67,12 @@ func (p *Plugin) KvFromConfig(key string) (kv.Storage, error) {
 	return st, nil
 }
 
-// JOBS bbolt implementation
-
-// DriverFromConfig constructs kafka driver from the .rr.yaml configuration
-func (p *Plugin) DriverFromConfig(configKey string, pq jobs.Queue, pipeline jobs.Pipeline) (jobs.Driver, error) {
-	return boltjobs.FromConfig(p.tracer, configKey, p.log, p.cfg, pipeline, pq)
+// DriverFromConfig constructs boltdb driver from the .rr.yaml configuration
+func (p *Plugin) DriverFromConfig(ctx context.Context, configKey string, pq jobs.Queue, pipeline jobs.Pipeline) (jobs.Driver, error) {
+	return boltjobs.FromConfig(ctx, p.tracer, configKey, p.log, p.cfg, pipeline, pq)
 }
 
-// DriverFromPipeline constructs kafka driver from pipeline
-func (p *Plugin) DriverFromPipeline(pipe jobs.Pipeline, pq jobs.Queue) (jobs.Driver, error) {
-	return boltjobs.FromPipeline(p.tracer, pipe, p.log, p.cfg, pq)
+// DriverFromPipeline constructs boltdb driver from pipeline
+func (p *Plugin) DriverFromPipeline(ctx context.Context, pipe jobs.Pipeline, pq jobs.Queue) (jobs.Driver, error) {
+	return boltjobs.FromPipeline(ctx, p.tracer, pipe, p.log, p.cfg, pq)
 }
