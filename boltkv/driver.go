@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"log/slog"
 	"os"
 	"strings"
 	"sync"
@@ -14,7 +15,6 @@ import (
 	"github.com/roadrunner-server/errors"
 	bolt "go.etcd.io/bbolt"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.uber.org/zap"
 )
 
 var _ kv.Storage = (*Driver)(nil)
@@ -35,7 +35,7 @@ type Driver struct {
 	clearMu sync.RWMutex
 	DB      *bolt.DB
 	bucket  []byte
-	log     *zap.Logger
+	log     *slog.Logger
 	cfg     *Config
 	tracer  *sdktrace.TracerProvider
 
@@ -45,7 +45,7 @@ type Driver struct {
 	stop chan struct{}
 }
 
-func NewBoltDBDriver(log *zap.Logger, key string, cfgPlugin Configurer, tracer *sdktrace.TracerProvider) (*Driver, error) {
+func NewBoltDBDriver(log *slog.Logger, key string, cfgPlugin Configurer, tracer *sdktrace.TracerProvider) (*Driver, error) {
 	const op = errors.Op("new_boltdb_driver")
 
 	if !cfgPlugin.Has(RootPluginName) {
@@ -99,7 +99,7 @@ func (d *Driver) Has(ctx context.Context, keys ...string) (map[string]bool, erro
 	_, span := d.tracer.Tracer(tracerName).Start(ctx, "boltdb:has")
 	defer span.End()
 
-	d.log.Debug("boltdb HAS method called", zap.Strings("args", keys))
+	d.log.Debug("boltdb HAS method called", "args", keys)
 	if keys == nil {
 		span.RecordError(errors.E(op, errors.NoKeys))
 		return nil, errors.E(op, errors.NoKeys)
@@ -381,13 +381,13 @@ func (d *Driver) Clear(ctx context.Context) error {
 	err := d.DB.Update(func(tx *bolt.Tx) error {
 		err := tx.DeleteBucket(d.bucket)
 		if err != nil {
-			d.log.Error("boltdb delete bucket", zap.Error(err))
+			d.log.Error("boltdb delete bucket", "error", err)
 			return err
 		}
 
 		_, err = tx.CreateBucket(d.bucket)
 		if err != nil {
-			d.log.Error("boltdb create bucket", zap.Error(err))
+			d.log.Error("boltdb create bucket", "error", err)
 			return err
 		}
 
@@ -396,7 +396,7 @@ func (d *Driver) Clear(ctx context.Context) error {
 
 	if err != nil {
 		span.RecordError(err)
-		d.log.Error("clear transaction failed", zap.Error(err))
+		d.log.Error("clear transaction failed", "error", err)
 		return err
 	}
 
@@ -427,14 +427,14 @@ func (d *Driver) startGCLoop() {
 				k := key.(string)
 				v, err := time.Parse(time.RFC3339, value.(string))
 				if err != nil {
-					d.log.Error("failed to parse TTL, removing entry", zap.String("key", k), zap.Error(err))
+					d.log.Error("failed to parse TTL, removing entry", "key", k, "error", err)
 					d.gc.Delete(k)
 					return true
 				}
 
 				if now.After(v) {
 					d.gc.Delete(k)
-					d.log.Debug("key deleted", zap.String("key", k))
+					d.log.Debug("key deleted", "key", k)
 					err := d.DB.Update(func(tx *bolt.Tx) error {
 						b := tx.Bucket(d.bucket)
 						if b == nil {
@@ -443,7 +443,7 @@ func (d *Driver) startGCLoop() {
 						return b.Delete(strToBytes(k))
 					})
 					if err != nil {
-						d.log.Error("error during the gc phase of update", zap.Error(err))
+						d.log.Error("error during the gc phase of update", "error", err)
 						return false
 					}
 				}
@@ -454,7 +454,7 @@ func (d *Driver) startGCLoop() {
 		case <-d.stop:
 			err := d.DB.Close()
 			if err != nil {
-				d.log.Error("error closing boltdb", zap.Error(err))
+				d.log.Error("error closing boltdb", "error", err)
 			}
 			return
 		}

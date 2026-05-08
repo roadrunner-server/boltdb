@@ -2,6 +2,7 @@ package boltdb
 
 import (
 	"context"
+	"log/slog"
 
 	_ "google.golang.org/genproto/protobuf/ptype" //nolint:revive,nolintlint
 
@@ -12,7 +13,6 @@ import (
 	"github.com/roadrunner-server/endure/v2/dep"
 	"github.com/roadrunner-server/errors"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.uber.org/zap"
 )
 
 var _ jobs.Constructor = (*Plugin)(nil)
@@ -27,7 +27,7 @@ type Configurer interface {
 }
 
 type Logger interface {
-	NamedLogger(name string) *zap.Logger
+	NamedLogger(name string) *slog.Logger
 }
 
 type Tracer interface {
@@ -35,7 +35,7 @@ type Tracer interface {
 }
 
 type Plugin struct {
-	log    *zap.Logger
+	log    *slog.Logger
 	cfg    Configurer
 	tracer *sdktrace.TracerProvider
 }

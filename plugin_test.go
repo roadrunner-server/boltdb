@@ -1,18 +1,18 @@
 package boltdb
 
 import (
+	"log/slog"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 type testLog struct{}
 
-func (tl *testLog) NamedLogger(string) *zap.Logger {
-	log, _ := zap.NewDevelopment()
-	return log
+func (tl *testLog) NamedLogger(string) *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 }
 
 func TestPluginInit(t *testing.T) {

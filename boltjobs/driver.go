@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
+	"log/slog"
 	"os"
 	"strconv"
 	"sync"
@@ -18,7 +19,6 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
 )
 
 var _ jobs.Driver = (*Driver)(nil)
@@ -52,7 +52,7 @@ type Driver struct {
 	db *bolt.DB
 
 	bPool    sync.Pool
-	log      *zap.Logger
+	log      *slog.Logger
 	pq       jobs.Queue
 	pipeline atomic.Pointer[jobs.Pipeline]
 	cond     *sync.Cond
@@ -64,7 +64,7 @@ type Driver struct {
 	stopCh chan struct{}
 }
 
-func FromConfig(_ context.Context, tracer *sdktrace.TracerProvider, configKey string, log *zap.Logger, cfg Configurer, pipe jobs.Pipeline, pq jobs.Queue) (*Driver, error) {
+func FromConfig(_ context.Context, tracer *sdktrace.TracerProvider, configKey string, log *slog.Logger, cfg Configurer, pipe jobs.Pipeline, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	var localCfg config
@@ -122,7 +122,7 @@ func FromConfig(_ context.Context, tracer *sdktrace.TracerProvider, configKey st
 	return dr, nil
 }
 
-func FromPipeline(_ context.Context, tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *zap.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
+func FromPipeline(_ context.Context, tracer *sdktrace.TracerProvider, pipeline jobs.Pipeline, log *slog.Logger, cfg Configurer, pq jobs.Queue) (*Driver, error) {
 	const op = errors.Op("init_boltdb_jobs")
 
 	var conf config
@@ -141,7 +141,7 @@ func FromPipeline(_ context.Context, tracer *sdktrace.TracerProvider, pipeline j
 	var perm int64
 	perm, err = strconv.ParseInt(pipeline.String(permissions, "0755"), 8, 32)
 	if err != nil {
-		log.Warn("failed to parse permissions, fallback to default 0755", zap.String("provided", pipeline.String(permissions, "")))
+		log.Warn("failed to parse permissions, fallback to default 0755", "provided", pipeline.String(permissions, ""))
 		perm = 493 // 0755
 	}
 
@@ -255,7 +255,7 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 	go d.delayedJobsListener()
 
 	atomic.AddUint32(&d.listeners, 1)
-	d.log.Debug("pipeline was started", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was started", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 	return nil
 }
 
@@ -274,7 +274,7 @@ func (d *Driver) Stop(ctx context.Context) error {
 
 	_ = d.pq.Remove(pipe.Name())
 
-	d.log.Debug("pipeline was stopped", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was stopped", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 	return d.db.Close()
 }
 
@@ -299,7 +299,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 
 	atomic.AddUint32(&d.listeners, ^uint32(0))
 
-	d.log.Debug("pipeline was paused", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was paused", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 
 	return nil
 }
@@ -325,7 +325,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 
 	atomic.AddUint32(&d.listeners, 1)
 
-	d.log.Debug("pipeline was resumed", zap.String("driver", pipe.Driver()), zap.String("pipeline", pipe.Name()), zap.Time("start", start), zap.Duration("elapsed", time.Since(start)))
+	d.log.Debug("pipeline was resumed", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 
 	return nil
 }

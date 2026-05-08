@@ -10,7 +10,6 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
-	"go.uber.org/zap"
 )
 
 func (d *Driver) listener() {
@@ -29,7 +28,7 @@ func (d *Driver) listener() {
 			}
 			tx, err := d.db.Begin(true)
 			if err != nil {
-				d.log.Error("failed to begin writable transaction", zap.Error(err))
+				d.log.Error("failed to begin writable transaction", "error", err)
 				continue
 			}
 
@@ -128,7 +127,7 @@ func (d *Driver) delayedJobsListener() {
 		case <-tt.C:
 			tx, err := d.db.Begin(true)
 			if err != nil {
-				d.log.Error("failed to begin writable transaction, job will be read on the next attempt", zap.Error(err))
+				d.log.Error("failed to begin writable transaction, job will be read on the next attempt", "error", err)
 				continue
 			}
 
@@ -187,9 +186,9 @@ func (d *Driver) delayedJobsListener() {
 func (d *Driver) rollback(err error, tx *bolt.Tx) {
 	errR := tx.Rollback()
 	if errR != nil {
-		d.log.Error("transaction commit error, rollback failed", zap.Error(err), zap.Error(errR))
+		d.log.Error("transaction commit error, rollback failed", "error", err, "error", errR)
 		return
 	}
 
-	d.log.Error("transaction commit error, rollback succeed", zap.Error(err))
+	d.log.Error("transaction commit error, rollback succeed", "error", err)
 }
