@@ -52,6 +52,10 @@ func NewBoltDBDriver(log *slog.Logger, key string, cfgPlugin Configurer, tracer 
 		return nil, errors.E(op, errors.Str("no kv section in the configuration"))
 	}
 
+	if tracer == nil {
+		tracer = sdktrace.NewTracerProvider()
+	}
+
 	d := &Driver{
 		log:    log,
 		stop:   make(chan struct{}, 1),
