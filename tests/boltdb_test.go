@@ -12,11 +12,6 @@ import (
 	"testing"
 	"time"
 
-	_ "google.golang.org/genproto/protobuf/ptype" //nolint:revive,nolintlint
-
-	"tests/helpers"
-	mocklogger "tests/mock"
-
 	jobState "github.com/roadrunner-server/api-plugins/v6/jobs"
 	jobsProto "github.com/roadrunner-server/api/v4/build/jobs/v1"
 	kvProto "github.com/roadrunner-server/api/v4/build/kv/v1"
@@ -34,7 +29,9 @@ import (
 	"github.com/roadrunner-server/server/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
+	_ "google.golang.org/genproto/protobuf/ptype" //nolint:revive,nolintlint
+	"tests/helpers"
+	mocklogger "tests/mock"
 )
 
 const (
@@ -126,7 +123,7 @@ func TestBoltDBPQ(t *testing.T) {
 		Prefix:  "rr",
 	}
 
-	l, oLogger := mocklogger.ZapTestLogger(zap.DebugLevel)
+	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
 	err := cont.RegisterAll(
 		cfg,
 		&server.Plugin{},
@@ -215,7 +212,7 @@ func TestBoltDBAutoAck(t *testing.T) {
 		Prefix:  "rr",
 	}
 
-	l, oLogger := mocklogger.ZapTestLogger(zap.DebugLevel)
+	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
 	err := cont.RegisterAll(
 		cfg,
 		&server.Plugin{},
@@ -615,7 +612,7 @@ func TestBoltDBOTEL(t *testing.T) {
 	}
 
 	tracer := mocklogger.NewInMemoryTracer(t)
-	l, oLogger := mocklogger.ZapTestLogger(zap.DebugLevel)
+	l, oLogger := mocklogger.SlogTestLogger(slog.LevelDebug)
 	err := cont.RegisterAll(
 		cfg,
 		&server.Plugin{},
