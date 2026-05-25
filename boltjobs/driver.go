@@ -57,7 +57,7 @@ type Driver struct {
 	pipeline atomic.Pointer[jobs.Pipeline]
 	cond     *sync.Cond
 
-	listeners uint32
+	listeners atomic.Uint32
 	active    *uint64
 	delayed   *uint64
 
@@ -254,7 +254,7 @@ func (d *Driver) Run(ctx context.Context, p jobs.Pipeline) error {
 	go d.listener() //nolint:gosec
 	go d.delayedJobsListener()
 
-	atomic.AddUint32(&d.listeners, 1)
+	d.listeners.Add(1)
 	d.log.Debug("pipeline was started", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 	return nil
 }
@@ -265,7 +265,7 @@ func (d *Driver) Stop(ctx context.Context) error {
 	_, span := trace.SpanFromContext(ctx).TracerProvider().Tracer(tracerName).Start(ctx, "boltdb_stop")
 	defer span.End()
 
-	if atomic.LoadUint32(&d.listeners) > 0 {
+	if d.listeners.Load() > 0 {
 		d.stopCh <- struct{}{}
 		d.stopCh <- struct{}{}
 	}
@@ -289,7 +289,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 		return errors.Errorf("no such pipeline: %s", pipe.Name())
 	}
 
-	l := atomic.LoadUint32(&d.listeners)
+	l := d.listeners.Load()
 	if l == 0 {
 		return errors.Str("no active listeners, nothing to pause")
 	}
@@ -297,7 +297,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 	d.stopCh <- struct{}{}
 	d.stopCh <- struct{}{}
 
-	atomic.AddUint32(&d.listeners, ^uint32(0))
+	d.listeners.Add(^uint32(0))
 
 	d.log.Debug("pipeline was paused", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 
@@ -315,7 +315,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 		return errors.Errorf("no such pipeline: %s", pipe.Name())
 	}
 
-	l := atomic.LoadUint32(&d.listeners)
+	l := d.listeners.Load()
 	if l == 1 {
 		return errors.Str("boltdb listener is already in the active state")
 	}
@@ -323,7 +323,7 @@ func (d *Driver) Resume(ctx context.Context, p string) error {
 	go d.listener() //nolint:gosec
 	go d.delayedJobsListener()
 
-	atomic.AddUint32(&d.listeners, 1)
+	d.listeners.Add(1)
 
 	d.log.Debug("pipeline was resumed", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 
@@ -343,7 +343,7 @@ func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 		Priority: uint64(pipe.Priority()),             //nolint:gosec
 		Active:   int64(atomic.LoadUint64(d.active)),  //nolint:gosec
 		Delayed:  int64(atomic.LoadUint64(d.delayed)), //nolint:gosec
-		Ready:    atomic.LoadUint32(&d.listeners) > 0,
+		Ready:    d.listeners.Load() > 0,
 	}, nil
 }
 
