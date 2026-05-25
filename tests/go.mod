@@ -12,12 +12,12 @@ require (
 	github.com/roadrunner-server/boltdb/v6 v6.0.0
 	github.com/roadrunner-server/config/v6 v6.0.0-beta.3
 	github.com/roadrunner-server/endure/v2 v2.6.2
-	github.com/roadrunner-server/informer/v6 v6.0.0-beta.1
-	github.com/roadrunner-server/jobs/v6 v6.0.0-beta.6
-	github.com/roadrunner-server/kv/v6 v6.0.0-beta.4
+	github.com/roadrunner-server/informer/v6 v6.0.0-beta.2
+	github.com/roadrunner-server/jobs/v6 v6.0.0-beta.7
+	github.com/roadrunner-server/kv/v6 v6.0.0-beta.5
 	github.com/roadrunner-server/logger/v6 v6.0.0-beta.3
 	github.com/roadrunner-server/memory/v6 v6.0.0-beta.3
-	github.com/roadrunner-server/resetter/v6 v6.0.0-beta.2
+	github.com/roadrunner-server/resetter/v6 v6.0.0-beta.3
 	github.com/roadrunner-server/rpc/v6 v6.0.0-beta.4
 	github.com/roadrunner-server/server/v6 v6.0.0-beta.5
 	github.com/stretchr/testify v1.11.1
@@ -63,8 +63,8 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spf13/viper v1.21.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/tklauser/go-sysconf v0.3.16 // indirect
-	github.com/tklauser/numcpus v0.11.0 // indirect
+	github.com/tklauser/go-sysconf v0.4.0 // indirect
+	github.com/tklauser/numcpus v0.12.0 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.etcd.io/bbolt v1.4.3 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
