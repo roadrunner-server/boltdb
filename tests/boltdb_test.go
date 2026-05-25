@@ -10,6 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"tests/helpers"
+	mocklogger "tests/mock"
+
 	"connectrpc.com/connect"
 	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v2"
 	kvProto "github.com/roadrunner-server/api-go/v6/kv/v2"
@@ -29,8 +32,6 @@ import (
 	"github.com/stretchr/testify/require"
 	_ "google.golang.org/genproto/protobuf/ptype" //nolint:revive,nolintlint
 	"google.golang.org/protobuf/types/known/durationpb"
-	"tests/helpers"
-	mocklogger "tests/mock"
 )
 
 const (
