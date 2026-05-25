@@ -2,8 +2,6 @@ package boltdb
 
 import (
 	"log/slog"
-	"net"
-	"net/rpc"
 	"os"
 	"os/signal"
 	"slices"
@@ -12,13 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"tests/helpers"
+	mocklogger "tests/mock"
+
+	"connectrpc.com/connect"
+	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v2"
+	kvProto "github.com/roadrunner-server/api-go/v6/kv/v2"
 	jobState "github.com/roadrunner-server/api-plugins/v6/jobs"
-	jobsProto "github.com/roadrunner-server/api/v4/build/jobs/v1"
-	kvProto "github.com/roadrunner-server/api/v4/build/kv/v1"
 	"github.com/roadrunner-server/boltdb/v6"
 	"github.com/roadrunner-server/config/v6"
 	"github.com/roadrunner-server/endure/v2"
-	goridgeRpc "github.com/roadrunner-server/goridge/v4/pkg/rpc"
 	"github.com/roadrunner-server/informer/v6"
 	"github.com/roadrunner-server/jobs/v6"
 	"github.com/roadrunner-server/kv/v6"
@@ -30,8 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	_ "google.golang.org/genproto/protobuf/ptype" //nolint:revive,nolintlint
-	"tests/helpers"
-	mocklogger "tests/mock"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 const (
@@ -782,205 +782,125 @@ func TestBoltDb(t *testing.T) {
 }
 
 func testRPCMethods(t *testing.T) {
-	conn, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", "127.0.0.1:6001")
-	assert.NoError(t, err)
-	client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
+	const storage = "boltdb-rr"
 
-	// add 5 second ttl
-	tt := time.Now().Add(time.Second * 5).Format(time.RFC3339)
-	keys := &kvProto.Request{
-		Storage: "boltdb-rr",
-		Items: []*kvProto.Item{
-			{
-				Key: "a",
-			},
-			{
-				Key: "b",
-			},
-			{
-				Key: "c",
-			},
+	client := helpers.NewKVClient(t, "127.0.0.1:6001")
+	ctx := t.Context()
+
+	tt := durationpb.New(time.Second * 5)
+	keys := &kvProto.KvRequest{
+		Storage: storage,
+		Items: []*kvProto.KvItem{
+			{Key: "a"},
+			{Key: "b"},
+			{Key: "c"},
 		},
 	}
 
-	data := &kvProto.Request{
-		Storage: "boltdb-rr",
-		Items: []*kvProto.Item{
-			{
-				Key:   "a",
-				Value: []byte("aa"),
-			},
-			{
-				Key:   "b",
-				Value: []byte("bb"),
-			},
-			{
-				Key:     "c",
-				Value:   []byte("cc"),
-				Timeout: tt,
-			},
-			{
-				Key:   "d",
-				Value: []byte("dd"),
-			},
-			{
-				Key:   "e",
-				Value: []byte("ee"),
-			},
+	data := &kvProto.KvRequest{
+		Storage: storage,
+		Items: []*kvProto.KvItem{
+			{Key: "a", Value: []byte("aa")},
+			{Key: "b", Value: []byte("bb")},
+			{Key: "c", Value: []byte("cc"), Ttl: tt},
+			{Key: "d", Value: []byte("dd")},
+			{Key: "e", Value: []byte("ee")},
 		},
 	}
 
-	ret := &kvProto.Response{}
-	// Register 3 keys with values
-	err = client.Call("kv.Set", data, ret)
+	_, err := client.Set(ctx, connect.NewRequest(data))
 	assert.NoError(t, err)
 
-	ret = &kvProto.Response{}
-	err = client.Call("kv.Has", keys, ret)
+	resp, err := client.Has(ctx, connect.NewRequest(keys))
 	assert.NoError(t, err)
-	assert.Len(t, ret.GetItems(), 3) // should be 3
+	assert.Len(t, resp.Msg.GetItems(), 3)
 
 	// key "c" should be deleted
 	time.Sleep(time.Second * 7)
 
-	ret = &kvProto.Response{}
-	err = client.Call("kv.Has", keys, ret)
+	resp, err = client.Has(ctx, connect.NewRequest(keys))
 	assert.NoError(t, err)
-	assert.Len(t, ret.GetItems(), 2) // should be 2
+	assert.Len(t, resp.Msg.GetItems(), 2)
 
-	ret = &kvProto.Response{}
-	err = client.Call("kv.MGet", keys, ret)
+	resp, err = client.MGet(ctx, connect.NewRequest(keys))
 	assert.NoError(t, err)
-	assert.Len(t, ret.GetItems(), 2) // c is expired
+	assert.Len(t, resp.Msg.GetItems(), 2) // c is expired
 
-	tt2 := time.Now().Add(time.Second * 10).Format(time.RFC3339)
+	tt2 := durationpb.New(time.Second * 10)
 
-	data2 := &kvProto.Request{
-		Storage: "boltdb-rr",
-		Items: []*kvProto.Item{
-			{
-				Key:     "a",
-				Timeout: tt2,
-			},
-			{
-				Key:     "b",
-				Timeout: tt2,
-			},
-			{
-				Key:     "d",
-				Timeout: tt2,
-			},
+	data2 := &kvProto.KvRequest{
+		Storage: storage,
+		Items: []*kvProto.KvItem{
+			{Key: "a", Ttl: tt2},
+			{Key: "b", Ttl: tt2},
+			{Key: "d", Ttl: tt2},
 		},
 	}
 
-	// MEXPIRE
-	ret = &kvProto.Response{}
-	err = client.Call("kv.MExpire", data2, ret)
+	_, err = client.MExpire(ctx, connect.NewRequest(data2))
 	assert.NoError(t, err)
 
-	// TTL
-	keys2 := &kvProto.Request{
-		Storage: "boltdb-rr",
-		Items: []*kvProto.Item{
-			{
-				Key: "a",
-			},
-			{
-				Key: "b",
-			},
-			{
-				Key: "d",
-			},
+	keys2 := &kvProto.KvRequest{
+		Storage: storage,
+		Items: []*kvProto.KvItem{
+			{Key: "a"},
+			{Key: "b"},
+			{Key: "d"},
 		},
 	}
 
-	ret = &kvProto.Response{}
-	err = client.Call("kv.TTL", keys2, ret)
+	resp, err = client.TTL(ctx, connect.NewRequest(keys2))
 	assert.NoError(t, err)
-	assert.Len(t, ret.GetItems(), 3)
+	assert.Len(t, resp.Msg.GetItems(), 3)
 
 	// HAS AFTER TTL
 	time.Sleep(time.Second * 15)
-	ret = &kvProto.Response{}
-	err = client.Call("kv.Has", keys2, ret)
+	resp, err = client.Has(ctx, connect.NewRequest(keys2))
 	assert.NoError(t, err)
-	assert.Len(t, ret.GetItems(), 0)
+	assert.Empty(t, resp.Msg.GetItems())
 
-	// DELETE
-	keysDel := &kvProto.Request{
-		Storage: "boltdb-rr",
-		Items: []*kvProto.Item{
-			{
-				Key: "e",
-			},
+	keysDel := &kvProto.KvRequest{
+		Storage: storage,
+		Items:   []*kvProto.KvItem{{Key: "e"}},
+	}
+
+	_, err = client.Delete(ctx, connect.NewRequest(keysDel))
+	assert.NoError(t, err)
+
+	resp, err = client.Has(ctx, connect.NewRequest(keysDel))
+	assert.NoError(t, err)
+	assert.Empty(t, resp.Msg.GetItems())
+
+	dataClear := &kvProto.KvRequest{
+		Storage: storage,
+		Items: []*kvProto.KvItem{
+			{Key: "a", Value: []byte("aa")},
+			{Key: "b", Value: []byte("bb")},
+			{Key: "c", Value: []byte("cc")},
+			{Key: "d", Value: []byte("dd")},
+			{Key: "e", Value: []byte("ee")},
 		},
 	}
 
-	ret = &kvProto.Response{}
-	err = client.Call("kv.Delete", keysDel, ret)
+	_, err = client.Set(ctx, connect.NewRequest(dataClear))
 	assert.NoError(t, err)
 
-	// HAS AFTER DELETE
-	ret = &kvProto.Response{}
-	err = client.Call("kv.Has", keysDel, ret)
+	resp, err = client.Has(ctx, connect.NewRequest(dataClear))
 	assert.NoError(t, err)
-	assert.Len(t, ret.GetItems(), 0)
+	assert.Len(t, resp.Msg.GetItems(), 5)
 
-	dataClear := &kvProto.Request{
-		Storage: "boltdb-rr",
-		Items: []*kvProto.Item{
-			{
-				Key:   "a",
-				Value: []byte("aa"),
-			},
-			{
-				Key:   "b",
-				Value: []byte("bb"),
-			},
-			{
-				Key:   "c",
-				Value: []byte("cc"),
-			},
-			{
-				Key:   "d",
-				Value: []byte("dd"),
-			},
-			{
-				Key:   "e",
-				Value: []byte("ee"),
-			},
-		},
-	}
-
-	clr := &kvProto.Request{Storage: "boltdb-rr"}
-
-	ret = &kvProto.Response{}
-	// Register 3 keys with values
-	err = client.Call("kv.Set", dataClear, ret)
+	_, err = client.Clear(ctx, connect.NewRequest(&kvProto.KvRequest{Storage: storage}))
 	assert.NoError(t, err)
 
-	ret = &kvProto.Response{}
-	err = client.Call("kv.Has", dataClear, ret)
+	resp, err = client.Has(ctx, connect.NewRequest(dataClear))
 	assert.NoError(t, err)
-	assert.Len(t, ret.GetItems(), 5) // should be 5
-
-	ret = &kvProto.Response{}
-	err = client.Call("kv.Clear", clr, ret)
-	assert.NoError(t, err)
-
-	ret = &kvProto.Response{}
-	err = client.Call("kv.Has", dataClear, ret)
-	assert.NoError(t, err)
-	assert.Len(t, ret.GetItems(), 0) // should be 5
+	assert.Empty(t, resp.Msg.GetItems())
 }
 
 func declareBoltDBPipe(address string, file string) func(t *testing.T) {
 	return func(t *testing.T) {
-		conn, err := (&net.Dialer{}).DialContext(t.Context(), "tcp", address)
-		assert.NoError(t, err)
-		client := rpc.NewClientWithCodec(goridgeRpc.NewClientCodec(conn))
-
-		pipe := &jobsProto.DeclareRequest{Pipeline: map[string]string{
+		client := helpers.NewJobsClient(t, address)
+		req := &jobsProto.DeclareRequest{Pipeline: map[string]string{
 			"driver":      "boltdb",
 			"name":        "test-3",
 			"prefetch":    "100",
@@ -988,9 +908,7 @@ func declareBoltDBPipe(address string, file string) func(t *testing.T) {
 			"priority":    "3",
 			"file":        file,
 		}}
-
-		er := &jobsProto.Empty{}
-		err = client.Call("jobs.Declare", pipe, er)
+		_, err := client.Declare(t.Context(), connect.NewRequest(req))
 		assert.NoError(t, err)
 	}
 }
