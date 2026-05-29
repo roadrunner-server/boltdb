@@ -159,13 +159,13 @@ func (d *Driver) Get(ctx context.Context, key string) ([]byte, error) {
 			buf := bytes.NewReader(val)
 			decoder := gob.NewDecoder(buf)
 
-			var i string
+			var i []byte
 			err := decoder.Decode(&i)
 			if err != nil {
 				return errors.E(op, err)
 			}
 
-			val = strToBytes(i)
+			val = i
 		}
 		return nil
 	})
@@ -423,38 +423,7 @@ func (d *Driver) startGCLoop() {
 	for {
 		select {
 		case <-t.C:
-			d.clearMu.RLock()
-
-			now := time.Now().UTC()
-			d.gc.Range(func(key, value any) bool {
-				const op = errors.Op("boltdb_plugin_gc")
-				k := key.(string)
-				v, err := time.Parse(time.RFC3339, value.(string))
-				if err != nil {
-					d.log.Error("failed to parse TTL, removing entry", "key", k, "error", err)
-					d.gc.Delete(k)
-					return true
-				}
-
-				if now.After(v) {
-					d.gc.Delete(k)
-					d.log.Debug("key deleted", "key", k)
-					err := d.DB.Update(func(tx *bolt.Tx) error {
-						b := tx.Bucket(d.bucket)
-						if b == nil {
-							return errors.E(op, errors.NoSuchBucket)
-						}
-						return b.Delete(strToBytes(k))
-					})
-					if err != nil {
-						d.log.Error("error during the gc phase of update", "error", err)
-						return false
-					}
-				}
-				return true
-			})
-
-			d.clearMu.RUnlock()
+			d.gcRun()
 		case <-d.stop:
 			err := d.DB.Close()
 			if err != nil {
@@ -463,6 +432,40 @@ func (d *Driver) startGCLoop() {
 			return
 		}
 	}
+}
+
+func (d *Driver) gcRun() {
+	d.clearMu.RLock()
+	defer d.clearMu.RUnlock()
+
+	now := time.Now().UTC()
+	d.gc.Range(func(key, value any) bool {
+		const op = errors.Op("boltdb_plugin_gc")
+		k := key.(string)
+		v, err := time.Parse(time.RFC3339, value.(string))
+		if err != nil {
+			d.log.Error("failed to parse TTL, removing entry", "key", k, "error", err)
+			d.gc.Delete(k)
+			return true
+		}
+
+		if now.After(v) {
+			d.gc.Delete(k)
+			d.log.Debug("key deleted", "key", k)
+			err := d.DB.Update(func(tx *bolt.Tx) error {
+				b := tx.Bucket(d.bucket)
+				if b == nil {
+					return errors.E(op, errors.NoSuchBucket)
+				}
+				return b.Delete(strToBytes(k))
+			})
+			if err != nil {
+				d.log.Error("error during the gc phase of update", "error", err)
+				return false
+			}
+		}
+		return true
+	})
 }
 
 func strToBytes(data string) []byte {

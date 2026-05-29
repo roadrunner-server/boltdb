@@ -55,11 +55,10 @@ type Driver struct {
 	log      *slog.Logger
 	pq       jobs.Queue
 	pipeline atomic.Pointer[jobs.Pipeline]
-	cond     *sync.Cond
 
 	listeners atomic.Uint32
-	active    *uint64
-	delayed   *uint64
+	active    atomic.Uint64
+	delayed   atomic.Uint64
 
 	stopCh chan struct{}
 }
@@ -106,10 +105,6 @@ func FromConfig(_ context.Context, tracer *sdktrace.TracerProvider, configKey st
 				return new(bytes.Buffer)
 			},
 		},
-		cond: sync.NewCond(&sync.Mutex{}),
-
-		delayed: new(uint64),
-		active:  new(uint64),
 
 		db:     db,
 		log:    log,
@@ -170,10 +165,6 @@ func FromPipeline(_ context.Context, tracer *sdktrace.TracerProvider, pipeline j
 		bPool: sync.Pool{New: func() any {
 			return new(bytes.Buffer)
 		}},
-		cond: sync.NewCond(&sync.Mutex{}),
-
-		delayed: new(uint64),
-		active:  new(uint64),
 
 		db:     db,
 		log:    log,
@@ -216,7 +207,7 @@ func (d *Driver) Push(ctx context.Context, job jobs.Message) error {
 				return errors.E(op, err)
 			}
 
-			atomic.AddUint64(d.delayed, 1)
+			d.delayed.Add(1)
 
 			return nil
 		}
@@ -227,7 +218,7 @@ func (d *Driver) Push(ctx context.Context, job jobs.Message) error {
 			return errors.E(op, err)
 		}
 
-		atomic.AddUint64(d.active, 1)
+		d.active.Add(1)
 
 		return nil
 	})
@@ -297,7 +288,7 @@ func (d *Driver) Pause(ctx context.Context, p string) error {
 	d.stopCh <- struct{}{}
 	d.stopCh <- struct{}{}
 
-	d.listeners.Add(^uint32(0))
+	d.listeners.Store(0)
 
 	d.log.Debug("pipeline was paused", "driver", pipe.Driver(), "pipeline", pipe.Name(), "start", start, "elapsed", time.Since(start))
 
@@ -340,9 +331,9 @@ func (d *Driver) State(ctx context.Context) (*jobs.State, error) {
 		Pipeline: pipe.Name(),
 		Driver:   pipe.Driver(),
 		Queue:    PushBucket,
-		Priority: uint64(pipe.Priority()),             //nolint:gosec
-		Active:   int64(atomic.LoadUint64(d.active)),  //nolint:gosec
-		Delayed:  int64(atomic.LoadUint64(d.delayed)), //nolint:gosec
+		Priority: uint64(pipe.Priority()), //nolint:gosec
+		Active:   int64(d.active.Load()),  //nolint:gosec
+		Delayed:  int64(d.delayed.Load()), //nolint:gosec
 		Ready:    d.listeners.Load() > 0,
 	}, nil
 }
@@ -374,6 +365,10 @@ func create(db *bolt.DB) error {
 
 		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
 			err = pushB.Put(k, v)
+			if err != nil {
+				return errors.E(upOp, err)
+			}
+			err = inQb.Delete(k)
 			if err != nil {
 				return errors.E(upOp, err)
 			}
