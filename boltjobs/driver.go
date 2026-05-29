@@ -359,16 +359,26 @@ func create(db *bolt.DB) error {
 		}
 
 		inQb := tx.Bucket(strToBytes(InQueueBucket))
-		cursor := inQb.Cursor()
-
 		pushB := tx.Bucket(strToBytes(PushBucket))
 
-		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
-			err = pushB.Put(k, v)
+		// Collect all in-queue entries before any deletes: deleting the
+		// current key mid-iteration shifts the underlying inode slice and
+		// causes cursor.Next() to skip the next entry.
+		type kv struct{ k, v []byte }
+		var entries []kv
+		cur := inQb.Cursor()
+		for k, v := cur.First(); k != nil; k, v = cur.Next() {
+			entries = append(entries, kv{
+				k: append([]byte(nil), k...),
+				v: append([]byte(nil), v...),
+			})
+		}
+		for _, e := range entries {
+			err = pushB.Put(e.k, e.v)
 			if err != nil {
 				return errors.E(upOp, err)
 			}
-			err = inQb.Delete(k)
+			err = inQb.Delete(e.k)
 			if err != nil {
 				return errors.E(upOp, err)
 			}

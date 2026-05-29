@@ -137,6 +137,10 @@ func (d *Driver) delayedJobsListener() {
 			cursor := delayB.Cursor()
 			endDate := strToBytes(time.Now().UTC().Format(time.RFC3339))
 
+			// Collect items ready to be enqueued; defer pq.Insert until after
+			// a successful commit so that a rollback does not leave ghost
+			// items in the in-memory queue.
+			var ready []*Item
 			txOk := true
 			for k, v := cursor.Seek(startDate); k != nil && slices.Compare(k, endDate) <= 0; k, v = cursor.Next() {
 				buf := bytes.NewReader(v)
@@ -175,7 +179,7 @@ func (d *Driver) delayedJobsListener() {
 				}
 
 				item.attachDB(d.db, &d.active, &d.delayed)
-				d.pq.Insert(item)
+				ready = append(ready, item)
 			}
 
 			if !txOk {
@@ -186,6 +190,10 @@ func (d *Driver) delayedJobsListener() {
 			if err != nil {
 				d.rollback(err, tx)
 				continue
+			}
+
+			for _, item := range ready {
+				d.pq.Insert(item)
 			}
 		}
 	}
