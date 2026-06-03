@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
-	"sync/atomic"
+	"slices"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -22,7 +22,7 @@ func (d *Driver) listener() {
 			_ = d.pq.Remove((*d.pipeline.Load()).Name())
 			return
 		case <-tt.C:
-			if atomic.LoadUint64(d.active) > uint64(d.prefetch) { //nolint:gosec
+			if d.active.Load() > uint64(d.prefetch) { //nolint:gosec
 				time.Sleep(time.Second)
 				continue
 			}
@@ -105,7 +105,7 @@ func (d *Driver) listener() {
 			}
 
 			d.prop.Inject(ctx, propagation.HeaderCarrier(item.headers))
-			item.attachDB(d.db, d.active, d.delayed)
+			item.attachDB(d.db, &d.active, &d.delayed)
 			d.pq.Insert(item)
 			span.End()
 		}
@@ -137,7 +137,12 @@ func (d *Driver) delayedJobsListener() {
 			cursor := delayB.Cursor()
 			endDate := strToBytes(time.Now().UTC().Format(time.RFC3339))
 
-			for k, v := cursor.Seek(startDate); k != nil && bytes.Compare(k, endDate) <= 0; k, v = cursor.Next() {
+			// Collect items ready to be enqueued; defer pq.Insert until after
+			// a successful commit so that a rollback does not leave ghost
+			// items in the in-memory queue.
+			var ready []*Item
+			txOk := true
+			for k, v := cursor.Seek(startDate); k != nil && slices.Compare(k, endDate) <= 0; k, v = cursor.Next() {
 				buf := bytes.NewReader(v)
 				dec := gob.NewDecoder(buf)
 
@@ -145,7 +150,8 @@ func (d *Driver) delayedJobsListener() {
 				err = dec.Decode(item)
 				if err != nil {
 					d.rollback(err, tx)
-					continue
+					txOk = false
+					break
 				}
 
 				if item.Options.Priority == 0 {
@@ -160,24 +166,34 @@ func (d *Driver) delayedJobsListener() {
 					err = inQb.Put(strToBytes(item.ID()), v)
 					if err != nil {
 						d.rollback(err, tx)
-						continue
+						txOk = false
+						break
 					}
 				}
 
 				err = delayB.Delete(k)
 				if err != nil {
 					d.rollback(err, tx)
-					continue
+					txOk = false
+					break
 				}
 
-				item.attachDB(d.db, d.active, d.delayed)
-				d.pq.Insert(item)
+				item.attachDB(d.db, &d.active, &d.delayed)
+				ready = append(ready, item)
+			}
+
+			if !txOk {
+				continue
 			}
 
 			err = tx.Commit()
 			if err != nil {
 				d.rollback(err, tx)
 				continue
+			}
+
+			for _, item := range ready {
+				d.pq.Insert(item)
 			}
 		}
 	}
@@ -186,7 +202,7 @@ func (d *Driver) delayedJobsListener() {
 func (d *Driver) rollback(err error, tx *bolt.Tx) {
 	errR := tx.Rollback()
 	if errR != nil {
-		d.log.Error("transaction commit error, rollback failed", "error", err, "error", errR)
+		d.log.Error("transaction commit error, rollback failed", "error", err, "rollback_error", errR)
 		return
 	}
 

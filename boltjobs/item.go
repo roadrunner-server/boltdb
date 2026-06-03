@@ -44,8 +44,8 @@ type Options struct {
 
 	// private
 	db      *bbolt.DB
-	active  *uint64
-	delayed *uint64
+	active  *atomic.Uint64
+	delayed *atomic.Uint64
 }
 
 func (i *Item) ID() string {
@@ -96,9 +96,9 @@ func (i *Item) Context() ([]byte, error) {
 func (i *Item) Ack() error {
 	defer func() {
 		if i.Options.Delay > 0 {
-			atomic.AddUint64(i.Options.delayed, ^uint64(0))
+			i.Options.delayed.Add(^uint64(0))
 		} else {
-			atomic.AddUint64(i.Options.active, ^uint64(0))
+			i.Options.active.Add(^uint64(0))
 		}
 	}()
 
@@ -234,7 +234,7 @@ func (i *Item) Respond(_ []byte, _ string) error {
 	return nil
 }
 
-func (i *Item) attachDB(db *bbolt.DB, active, delayed *uint64) {
+func (i *Item) attachDB(db *bbolt.DB, active, delayed *atomic.Uint64) {
 	i.Options.db = db
 	i.Options.active = active
 	i.Options.delayed = delayed
