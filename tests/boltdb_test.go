@@ -13,7 +13,6 @@ import (
 	"tests/helpers"
 	mocklogger "tests/mock"
 
-	"connectrpc.com/connect"
 	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v2"
 	kvProto "github.com/roadrunner-server/api-go/v6/kv/v2"
 	jobState "github.com/roadrunner-server/api-plugins/v6/jobs"
@@ -768,8 +767,7 @@ func TestBoltDb(t *testing.T) {
 func testRPCMethods(t *testing.T) {
 	const storage = "boltdb-rr"
 
-	client := helpers.NewKVClient(t, "127.0.0.1:6001")
-	ctx := t.Context()
+	client := helpers.NewRPCClient(t, "127.0.0.1:6001")
 
 	tt := durationpb.New(time.Second * 5)
 	keys := &kvProto.KvRequest{
@@ -792,23 +790,27 @@ func testRPCMethods(t *testing.T) {
 		},
 	}
 
-	_, err := client.Set(ctx, connect.NewRequest(data))
+	resp := &kvProto.KvResponse{}
+	err := client.Call("kv.Set", data, resp)
 	assert.NoError(t, err)
 
-	resp, err := client.Has(ctx, connect.NewRequest(keys))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Has", keys, resp)
 	assert.NoError(t, err)
-	assert.Len(t, resp.Msg.GetItems(), 3)
+	assert.Len(t, resp.GetItems(), 3)
 
 	// key "c" should be deleted
 	time.Sleep(time.Second * 7)
 
-	resp, err = client.Has(ctx, connect.NewRequest(keys))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Has", keys, resp)
 	assert.NoError(t, err)
-	assert.Len(t, resp.Msg.GetItems(), 2)
+	assert.Len(t, resp.GetItems(), 2)
 
-	resp, err = client.MGet(ctx, connect.NewRequest(keys))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.MGet", keys, resp)
 	assert.NoError(t, err)
-	assert.Len(t, resp.Msg.GetItems(), 2) // c is expired
+	assert.Len(t, resp.GetItems(), 2) // c is expired
 
 	tt2 := durationpb.New(time.Second * 10)
 
@@ -821,7 +823,8 @@ func testRPCMethods(t *testing.T) {
 		},
 	}
 
-	_, err = client.MExpire(ctx, connect.NewRequest(data2))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.MExpire", data2, resp)
 	assert.NoError(t, err)
 
 	keys2 := &kvProto.KvRequest{
@@ -833,27 +836,31 @@ func testRPCMethods(t *testing.T) {
 		},
 	}
 
-	resp, err = client.TTL(ctx, connect.NewRequest(keys2))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.TTL", keys2, resp)
 	assert.NoError(t, err)
-	assert.Len(t, resp.Msg.GetItems(), 3)
+	assert.Len(t, resp.GetItems(), 3)
 
 	// HAS AFTER TTL
 	time.Sleep(time.Second * 15)
-	resp, err = client.Has(ctx, connect.NewRequest(keys2))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Has", keys2, resp)
 	assert.NoError(t, err)
-	assert.Empty(t, resp.Msg.GetItems())
+	assert.Empty(t, resp.GetItems())
 
 	keysDel := &kvProto.KvRequest{
 		Storage: storage,
 		Items:   []*kvProto.KvItem{{Key: "e"}},
 	}
 
-	_, err = client.Delete(ctx, connect.NewRequest(keysDel))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Delete", keysDel, resp)
 	assert.NoError(t, err)
 
-	resp, err = client.Has(ctx, connect.NewRequest(keysDel))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Has", keysDel, resp)
 	assert.NoError(t, err)
-	assert.Empty(t, resp.Msg.GetItems())
+	assert.Empty(t, resp.GetItems())
 
 	dataClear := &kvProto.KvRequest{
 		Storage: storage,
@@ -866,24 +873,28 @@ func testRPCMethods(t *testing.T) {
 		},
 	}
 
-	_, err = client.Set(ctx, connect.NewRequest(dataClear))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Set", dataClear, resp)
 	assert.NoError(t, err)
 
-	resp, err = client.Has(ctx, connect.NewRequest(dataClear))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Has", dataClear, resp)
 	assert.NoError(t, err)
-	assert.Len(t, resp.Msg.GetItems(), 5)
+	assert.Len(t, resp.GetItems(), 5)
 
-	_, err = client.Clear(ctx, connect.NewRequest(&kvProto.KvRequest{Storage: storage}))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Clear", &kvProto.KvRequest{Storage: storage}, resp)
 	assert.NoError(t, err)
 
-	resp, err = client.Has(ctx, connect.NewRequest(dataClear))
+	resp = &kvProto.KvResponse{}
+	err = client.Call("kv.Has", dataClear, resp)
 	assert.NoError(t, err)
-	assert.Empty(t, resp.Msg.GetItems())
+	assert.Empty(t, resp.GetItems())
 }
 
 func declareBoltDBPipe(address string, file string) func(t *testing.T) {
 	return func(t *testing.T) {
-		client := helpers.NewJobsClient(t, address)
+		client := helpers.NewRPCClient(t, address)
 		req := &jobsProto.DeclareRequest{Pipeline: map[string]string{
 			"driver":      "boltdb",
 			"name":        "test-3",
@@ -892,7 +903,7 @@ func declareBoltDBPipe(address string, file string) func(t *testing.T) {
 			"priority":    "3",
 			"file":        file,
 		}}
-		_, err := client.Declare(t.Context(), connect.NewRequest(req))
+		err := client.Call("jobs.Declare", req, &jobsProto.JobsHandlerResponse{})
 		assert.NoError(t, err)
 	}
 }
