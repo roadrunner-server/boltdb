@@ -6,7 +6,7 @@ import (
 
 	"tests/helpers"
 
-	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v2"
+	jobsProto "github.com/roadrunner-server/api-go/v6/jobs/v1"
 	jobState "github.com/roadrunner-server/api-plugins/v6/jobs"
 	boltdbPlugin "github.com/roadrunner-server/boltdb/v6"
 	"github.com/roadrunner-server/informer/v6"
@@ -80,7 +80,7 @@ func declarePipe(t *testing.T, rpcAddr, file string) {
 		"file":        file,
 	}}
 
-	require.NoError(t, client.Call("jobs.Declare", req, &jobsProto.JobsHandlerResponse{}))
+	require.NoError(t, client.Call("jobs.Declare", req, &jobsProto.Empty{}))
 }
 
 // TestBoots covers the plain init config.
