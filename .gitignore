@@ -18,3 +18,5 @@ vendor/
 .DS_Store
 **/composer.lock
 .claude/settings.local.json
+# bolt files the tests create in the working directory
+tests/*.db
