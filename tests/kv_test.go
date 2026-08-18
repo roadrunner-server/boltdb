@@ -7,13 +7,12 @@ import (
 
 	"tests/helpers"
 
-	kvProto "github.com/roadrunner-server/api-go/v6/kv/v2"
+	kvProto "github.com/roadrunner-server/api-go/v6/kv/v1"
 	boltdbPlugin "github.com/roadrunner-server/boltdb/v6"
 	"github.com/roadrunner-server/kv/v6"
 	"github.com/roadrunner-server/memory/v6"
 	rpcPlugin "github.com/roadrunner-server/rpc/v6"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 const (
@@ -37,23 +36,23 @@ func bootKV(t *testing.T) *rpc.Client {
 	)
 
 	client := helpers.NewRPCClient(t, defaultRPC)
-	require.NoError(t, client.Call("kv.Clear", &kvProto.KvRequest{Storage: kvStorage}, &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.Clear", &kvProto.Request{Storage: kvStorage}, &kvProto.Response{}))
 
 	return client
 }
 
-func kvItems(pairs map[string]string) *kvProto.KvRequest {
-	req := &kvProto.KvRequest{Storage: kvStorage}
+func kvItems(pairs map[string]string) *kvProto.Request {
+	req := &kvProto.Request{Storage: kvStorage}
 	for k, v := range pairs {
-		req.Items = append(req.Items, &kvProto.KvItem{Key: k, Value: []byte(v)})
+		req.Items = append(req.Items, &kvProto.Item{Key: k, Value: []byte(v)})
 	}
 	return req
 }
 
-func kvKeys(names ...string) *kvProto.KvRequest {
-	req := &kvProto.KvRequest{Storage: kvStorage}
+func kvKeys(names ...string) *kvProto.Request {
+	req := &kvProto.Request{Storage: kvStorage}
 	for _, n := range names {
-		req.Items = append(req.Items, &kvProto.KvItem{Key: n})
+		req.Items = append(req.Items, &kvProto.Item{Key: n})
 	}
 	return req
 }
@@ -62,7 +61,7 @@ func kvKeys(names ...string) *kvProto.KvRequest {
 func kvHas(t *testing.T, client *rpc.Client, names ...string) int {
 	t.Helper()
 
-	resp := &kvProto.KvResponse{}
+	resp := &kvProto.Response{}
 	require.NoError(t, client.Call("kv.Has", kvKeys(names...), resp))
 
 	return len(resp.GetItems())
@@ -71,7 +70,7 @@ func kvHas(t *testing.T, client *rpc.Client, names ...string) int {
 func TestKVSetAndHas(t *testing.T) {
 	client := bootKV(t)
 
-	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.Response{}))
 
 	require.Equal(t, 2, kvHas(t, client, "a", "b"))
 	require.Equal(t, 0, kvHas(t, client, "missing"))
@@ -82,9 +81,9 @@ func TestKVSetAndHas(t *testing.T) {
 func TestKVMGetReturnsStoredValues(t *testing.T) {
 	client := bootKV(t)
 
-	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.Response{}))
 
-	resp := &kvProto.KvResponse{}
+	resp := &kvProto.Response{}
 	require.NoError(t, client.Call("kv.MGet", kvKeys("a", "b", "absent"), resp))
 
 	got := make(map[string]string, len(resp.GetItems()))
@@ -98,8 +97,8 @@ func TestKVMGetReturnsStoredValues(t *testing.T) {
 func TestKVDeleteRemovesOnlyTheNamedKey(t *testing.T) {
 	client := bootKV(t)
 
-	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.KvResponse{}))
-	require.NoError(t, client.Call("kv.Delete", kvKeys("a"), &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.Response{}))
+	require.NoError(t, client.Call("kv.Delete", kvKeys("a"), &kvProto.Response{}))
 
 	require.Equal(t, 0, kvHas(t, client, "a"))
 	require.Equal(t, 1, kvHas(t, client, "b"))
@@ -108,8 +107,8 @@ func TestKVDeleteRemovesOnlyTheNamedKey(t *testing.T) {
 func TestKVClearEmptiesTheStorage(t *testing.T) {
 	client := bootKV(t)
 
-	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.KvResponse{}))
-	require.NoError(t, client.Call("kv.Clear", &kvProto.KvRequest{Storage: kvStorage}, &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.Response{}))
+	require.NoError(t, client.Call("kv.Clear", &kvProto.Request{Storage: kvStorage}, &kvProto.Response{}))
 
 	require.Equal(t, 0, kvHas(t, client, "a", "b"))
 }
@@ -119,16 +118,16 @@ func TestKVClearEmptiesTheStorage(t *testing.T) {
 func TestKVTTLReportsRemainingLifetime(t *testing.T) {
 	client := bootKV(t)
 
-	req := &kvProto.KvRequest{
+	req := &kvProto.Request{
 		Storage: kvStorage,
-		Items: []*kvProto.KvItem{
+		Items: []*kvProto.Item{
 			{Key: "permanent", Value: []byte("v")},
-			{Key: "ephemeral", Value: []byte("v"), Ttl: durationpb.New(time.Minute)},
+			{Key: "ephemeral", Value: []byte("v"), Timeout: time.Now().UTC().Add(time.Minute).Format(time.RFC3339)},
 		},
 	}
-	require.NoError(t, client.Call("kv.Set", req, &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.Set", req, &kvProto.Response{}))
 
-	resp := &kvProto.KvResponse{}
+	resp := &kvProto.Response{}
 	require.NoError(t, client.Call("kv.TTL", kvKeys("permanent", "ephemeral"), resp))
 
 	require.Len(t, resp.GetItems(), 1)
@@ -140,14 +139,14 @@ func TestKVTTLReportsRemainingLifetime(t *testing.T) {
 func TestKVKeyExpiresAfterTTL(t *testing.T) {
 	client := bootKV(t)
 
-	req := &kvProto.KvRequest{
+	req := &kvProto.Request{
 		Storage: kvStorage,
-		Items: []*kvProto.KvItem{
+		Items: []*kvProto.Item{
 			{Key: "permanent", Value: []byte("v")},
-			{Key: "ephemeral", Value: []byte("v"), Ttl: durationpb.New(shortTTL)},
+			{Key: "ephemeral", Value: []byte("v"), Timeout: time.Now().UTC().Add(shortTTL).Format(time.RFC3339)},
 		},
 	}
-	require.NoError(t, client.Call("kv.Set", req, &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.Set", req, &kvProto.Response{}))
 	require.Equal(t, 2, kvHas(t, client, "permanent", "ephemeral"))
 
 	require.Eventually(t, func() bool {
@@ -160,16 +159,16 @@ func TestKVKeyExpiresAfterTTL(t *testing.T) {
 func TestKVMExpireAppliesTTLToExistingKeys(t *testing.T) {
 	client := bootKV(t)
 
-	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.Set", kvItems(map[string]string{"a": "aa", "b": "bb"}), &kvProto.Response{}))
 
-	expire := &kvProto.KvRequest{
+	expire := &kvProto.Request{
 		Storage: kvStorage,
-		Items: []*kvProto.KvItem{
-			{Key: "a", Ttl: durationpb.New(shortTTL)},
-			{Key: "b", Ttl: durationpb.New(shortTTL)},
+		Items: []*kvProto.Item{
+			{Key: "a", Timeout: time.Now().UTC().Add(shortTTL).Format(time.RFC3339)},
+			{Key: "b", Timeout: time.Now().UTC().Add(shortTTL).Format(time.RFC3339)},
 		},
 	}
-	require.NoError(t, client.Call("kv.MExpire", expire, &kvProto.KvResponse{}))
+	require.NoError(t, client.Call("kv.MExpire", expire, &kvProto.Response{}))
 
 	require.Eventually(t, func() bool {
 		return kvHas(t, client, "a", "b") == 0
@@ -179,10 +178,10 @@ func TestKVMExpireAppliesTTLToExistingKeys(t *testing.T) {
 func TestKVUnknownStorageIsRejected(t *testing.T) {
 	client := bootKV(t)
 
-	err := client.Call("kv.Has", &kvProto.KvRequest{
+	err := client.Call("kv.Has", &kvProto.Request{
 		Storage: "not-configured",
-		Items:   []*kvProto.KvItem{{Key: "a"}},
-	}, &kvProto.KvResponse{})
+		Items:   []*kvProto.Item{{Key: "a"}},
+	}, &kvProto.Response{})
 
 	require.Error(t, err)
 }
