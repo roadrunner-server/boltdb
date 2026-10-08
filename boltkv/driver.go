@@ -203,15 +203,13 @@ func (d *Driver) MGet(ctx context.Context, keys ...string) (map[string][]byte, e
 			return errors.E(op, errors.NoSuchBucket)
 		}
 
-		buf := new(bytes.Buffer)
-		buf.Grow(100)
+		reader := bytes.NewReader(nil)
 		for i := range keys {
 			value := b.Get([]byte(keys[i]))
 			if value != nil {
-				buf.Reset()
-				buf.Write(value)
+				reader.Reset(value)
 				var out []byte
-				err := gob.NewDecoder(buf).Decode(&out)
+				err := gob.NewDecoder(reader).Decode(&out)
 				if err != nil {
 					return errors.E(op, err)
 				}
