@@ -2,19 +2,19 @@ module github.com/roadrunner-server/boltdb/v6
 
 go 1.27
 
-toolchain go1.27.1
+toolchain go1.27.2
 
 require (
-	github.com/roadrunner-server/api-plugins/v6 v6.0.0-beta.2
-	github.com/roadrunner-server/endure/v2 v2.6.2
-	github.com/roadrunner-server/errors v1.5.0
+	github.com/roadrunner-server/api-plugins/v6 v6.0.0
+	github.com/roadrunner-server/endure/v2 v2.7.0
+	github.com/roadrunner-server/errors v1.6.0
 	github.com/stretchr/testify v1.12.1
 	go.etcd.io/bbolt v1.5.0
 	go.opentelemetry.io/contrib/propagators/jaeger v1.47.0
 	go.opentelemetry.io/otel v1.47.0
 	go.opentelemetry.io/otel/sdk v1.47.0
 	go.opentelemetry.io/otel/trace v1.47.0
-	google.golang.org/genproto v0.0.0-20261005182115-fad411399dd8
+	google.golang.org/genproto v0.0.0-20261012220534-4341edf3f941
 )
 
 exclude (
@@ -31,7 +31,7 @@ require (
 	go.opentelemetry.io/otel/log v1.47.0 // indirect
 	go.opentelemetry.io/otel/metric v1.47.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/sync v0.23.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/sync v0.24.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 )
